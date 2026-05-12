@@ -5,7 +5,9 @@ import { MyApplicationsPage } from "./routes/MyApplicationsPage.tsx"
 import { ApplicationDetailsPage } from "./routes/ApplicationDetailsPage.tsx"
 import { AppStorePage } from "./routes/AppStorePage.tsx"
 import { TemplateDetailsPage } from "./routes/TemplateDetailsPage.tsx"
+import { LaunchFormPage } from "./routes/LaunchFormPage.tsx"
 import { EnvironmentsPage } from "./routes/EnvironmentsPage.tsx"
+import { EnvironmentCreatePage } from "./routes/EnvironmentCreatePage.tsx"
 
 const TABS: HeaderTab[] = [
   { id: "apps", label: "Apps", to: "/apps", highlight: true },
@@ -25,7 +27,9 @@ export default function App() {
         <Route path="/apps/:name" element={<ApplicationDetailsPage />} />
         <Route path="/store" element={<AppStorePage />} />
         <Route path="/store/:template" element={<TemplateDetailsPage />} />
+        <Route path="/store/:template/launch" element={<LaunchFormPage />} />
         <Route path="/environments" element={<EnvironmentsPage />} />
+        <Route path="/environments/create" element={<EnvironmentCreatePage />} />
       </Routes>
     </AppShell>
   )
