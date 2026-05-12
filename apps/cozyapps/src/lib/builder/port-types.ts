@@ -57,11 +57,24 @@ const PORT_ANCESTORS: Partial<Record<PortType, PortType[]>> = {
   "tls-secret-ref": ["secret-ref"],
 }
 
+/**
+ * Port families — string, ingress-host and image-ref are all backed by a
+ * plain string at the manifest level; the dedicated types only carry a
+ * colour and a UX hint, so they are interchangeable in either direction.
+ */
+const PORT_FAMILY: Partial<Record<PortType, string>> = {
+  string: "string",
+  "ingress-host": "string",
+  "image-ref": "string",
+}
+
 export function isCompatible(source: PortType, target: PortType): boolean {
   if (source === target) return true
   if (source === "any" || target === "any") return true
-  const ancestors = PORT_ANCESTORS[source] ?? []
-  return ancestors.includes(target)
+  if ((PORT_ANCESTORS[source] ?? []).includes(target)) return true
+  const family = PORT_FAMILY[source]
+  if (family && PORT_FAMILY[target] === family) return true
+  return false
 }
 
 /** Bridge ParamDef.type → PortType when a param is exposed as an input. */
