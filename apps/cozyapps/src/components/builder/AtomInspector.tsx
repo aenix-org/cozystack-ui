@@ -3,8 +3,10 @@ import { Button, cn } from "@cozystack/ui"
 import { findAtom } from "../../lib/builder/atoms.ts"
 import type { ParamDef } from "../../lib/types.ts"
 import type { AtomNodeData } from "../../lib/builder/types.ts"
+import type { UserInputField } from "../../lib/builder/dynamic-fields.ts"
 import { FormField, inputClass } from "../FormField.tsx"
 import { Toggle } from "../Toggle.tsx"
+import { FieldsEditor } from "./FieldsEditor.tsx"
 
 interface AtomInspectorProps {
   nodeId: string
@@ -108,6 +110,18 @@ export function AtomInspector({
 
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         <p className="text-xs leading-relaxed text-slate-500">{atom.description}</p>
+
+        {atom.hasDynamicFields && (
+          <section>
+            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              Form fields
+            </h3>
+            <FieldsEditor
+              fields={data.fields ?? []}
+              onChange={(next: UserInputField[]) => onChange({ ...data, fields: next })}
+            />
+          </section>
+        )}
 
         {atom.params.length > 0 ? (
           <div className="space-y-3">

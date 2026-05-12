@@ -38,9 +38,14 @@ import {
 import { addTemplate } from "../lib/mock-store.ts"
 import {
   ATOMS,
+  effectiveOutputs,
   findAtom,
   type AtomDef,
 } from "../lib/builder/atoms.ts"
+import {
+  DEFAULT_USER_INPUT_FIELDS,
+  fieldToParam,
+} from "../lib/builder/dynamic-fields.ts"
 import {
   isCompatible,
   paramTypeToPortType,
@@ -133,7 +138,9 @@ function BuilderInner() {
       const sourceAtom = findAtom(sourceNode.data.atomType)
       const targetAtom = findAtom(targetNode.data.atomType)
       if (!sourceAtom || !targetAtom) return
-      const sourcePort = sourceAtom.outputs.find((p) => p.key === connection.sourceHandle)
+      const sourcePort = effectiveOutputs(sourceAtom, sourceNode.data).find(
+        (p) => p.key === connection.sourceHandle,
+      )
       if (!sourcePort) return
 
       let targetType
@@ -185,7 +192,7 @@ function BuilderInner() {
       if (!atom) return
 
       if (handleType === "source") {
-        const port = atom.outputs.find((p) => p.key === handleId)
+        const port = effectiveOutputs(atom, node.data).find((p) => p.key === handleId)
         if (!port) return
         connectStart.current = {
           nodeId,
@@ -315,6 +322,7 @@ function BuilderInner() {
             atomType,
             params: defaultParams(atom),
             exposed: [],
+            fields: atom.hasDynamicFields ? [...DEFAULT_USER_INPUT_FIELDS] : undefined,
             status: "idle",
           },
         }
@@ -460,6 +468,18 @@ function BuilderInner() {
 
   const handlePublish = useCallback(
     (draft: PublishedTemplateDraft) => {
+      const userInputNode = nodes.find((n) => n.data.atomType === "user-input")
+      const parameters = userInputNode?.data.fields?.length
+        ? userInputNode.data.fields.map(fieldToParam)
+        : [
+            {
+              key: "name",
+              label: "Name",
+              type: "string" as const,
+              placeholder: draft.slug,
+              required: true,
+            },
+          ]
       const template: ApplicationTemplate = {
         slug: draft.slug,
         displayName: draft.displayName,
@@ -476,15 +496,7 @@ function BuilderInner() {
           .map((n) => findAtom(n.data.atomType)?.displayName)
           .filter((x): x is string => Boolean(x)),
         actions: [{ name: "Restart", description: "Restart the application" }],
-        parameters: [
-          {
-            key: "name",
-            label: "Name",
-            type: "string",
-            placeholder: draft.slug,
-            required: true,
-          },
-        ],
+        parameters,
       }
       addTemplate(template)
       setPublishOpen(false)

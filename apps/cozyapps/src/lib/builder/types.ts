@@ -8,11 +8,15 @@ export const ATOM_EDGE_MARKERS = {
   height: 14,
 }
 
+import type { UserInputField } from "./dynamic-fields.ts"
+
 export interface AtomNodeData {
   atomType: string
   params: Record<string, unknown>
   /** Param keys promoted to input ports — replace inline editor with a handle. */
   exposed: string[]
+  /** Dynamic form fields for atoms with hasDynamicFields (User Input). */
+  fields?: UserInputField[]
   status: RunStatus
   [key: string]: unknown
 }

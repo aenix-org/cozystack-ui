@@ -2,7 +2,12 @@ import { memo } from "react"
 import { Handle, Position, type NodeProps } from "@xyflow/react"
 import { CheckCircle2, Loader2, XCircle } from "lucide-react"
 import { cn } from "@cozystack/ui"
-import { findAtom, type AtomDef } from "../../lib/builder/atoms.ts"
+import {
+  findAtom,
+  effectiveOutputs,
+  type AtomDef,
+  type PortDef,
+} from "../../lib/builder/atoms.ts"
 import { PORT_TYPE, paramTypeToPortType } from "../../lib/builder/port-types.ts"
 import {
   paramHandleId,
@@ -50,10 +55,12 @@ function AtomNodeImpl({ data, selected }: NodeProps) {
   const nodeData = data as AtomNodeData
   const atom = findAtom(nodeData.atomType)
   if (!atom) return null
+  const outputs = effectiveOutputs(atom, nodeData)
 
   return (
     <AtomNodeContent
       atom={atom}
+      outputs={outputs}
       status={nodeData.status}
       exposed={nodeData.exposed ?? []}
       selected={!!selected}
@@ -63,19 +70,20 @@ function AtomNodeImpl({ data, selected }: NodeProps) {
 
 interface AtomNodeContentProps {
   atom: AtomDef
+  outputs: PortDef[]
   status: RunStatus
   exposed: string[]
   selected: boolean
 }
 
-function AtomNodeContent({ atom, status, exposed, selected }: AtomNodeContentProps) {
+function AtomNodeContent({ atom, outputs, status, exposed, selected }: AtomNodeContentProps) {
   const Icon = atom.icon
   const exposedParams = atom.params.filter((p) => exposed.includes(p.key))
   const inputCount = atom.inputs.length
   const exposedCount = exposedParams.length
   const showDivider = inputCount > 0 && exposedCount > 0
   const leftCount = inputCount + exposedCount
-  const totalPorts = leftCount + atom.outputs.length
+  const totalPorts = leftCount + outputs.length
   const dividerExtra = showDivider ? 6 : 0
   const minBodyHeight = Math.max(totalPorts, 1) * PORT_ROW_H + PORTS_PAD * 2 + dividerExtra
 
@@ -171,7 +179,7 @@ function AtomNodeContent({ atom, status, exposed, selected }: AtomNodeContentPro
             </div>
           )
         })}
-        {atom.outputs.map((port, idx) => (
+        {outputs.map((port, idx) => (
           <div
             key={`out-${port.key}`}
             className="flex items-center text-xs text-slate-600"

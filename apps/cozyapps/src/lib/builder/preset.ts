@@ -1,5 +1,6 @@
 import type { Edge, Node } from "@xyflow/react"
 import { ATOM_EDGE_MARKERS, type AtomNodeData } from "./types.ts"
+import { DEFAULT_USER_INPUT_FIELDS } from "./dynamic-fields.ts"
 
 type BuilderNode = Node<AtomNodeData>
 
@@ -18,7 +19,8 @@ export function presetWordpress(): PresetGraph {
       position: { x: 0, y: 0 },
       data: {
         atomType: "user-input",
-        params: { fields: "host, name, image" },
+        params: {},
+        fields: [...DEFAULT_USER_INPUT_FIELDS],
         ...idle,
       },
     },

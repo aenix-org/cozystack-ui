@@ -43,6 +43,11 @@ export interface AtomDef {
   inputs: PortDef[]
   outputs: PortDef[]
   params: ParamDef[]
+  /**
+   * Override the static outputs with a list of fields editable on the node
+   * (currently only the User Input atom). Outputs come from node.data.fields.
+   */
+  hasDynamicFields?: boolean
 }
 
 export const ATOMS: AtomDef[] = [
@@ -56,20 +61,9 @@ export const ATOMS: AtomDef[] = [
     accentBg: "bg-slate-100",
     accentFg: "text-slate-700",
     inputs: [],
-    outputs: [
-      { key: "host", label: "host", type: "ingress-host" },
-      { key: "name", label: "name", type: "string" },
-      { key: "image", label: "image", type: "image-ref" },
-    ],
-    params: [
-      {
-        key: "fields",
-        label: "Field list",
-        type: "string",
-        defaultValue: "host, name, image",
-        hint: "Comma-separated form fields presented to the user",
-      },
-    ],
+    outputs: [],
+    params: [],
+    hasDynamicFields: true,
   },
 
   // ─── K8s Primitives ───────────────────────────────────────────────────
@@ -398,4 +392,15 @@ export function categoryIcon(category: AtomCategory): LucideIcon {
 
 export function findAtom(type: string): AtomDef | undefined {
   return ATOMS.find((a) => a.type === type)
+}
+
+import type { AtomNodeData } from "./types.ts"
+import { fieldToPort } from "./dynamic-fields.ts"
+
+/** Outputs accounting for dynamic fields (User Input). */
+export function effectiveOutputs(atom: AtomDef, data: AtomNodeData): PortDef[] {
+  if (atom.hasDynamicFields) {
+    return (data.fields ?? []).map(fieldToPort)
+  }
+  return atom.outputs
 }
