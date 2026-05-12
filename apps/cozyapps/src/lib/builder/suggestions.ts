@@ -1,5 +1,13 @@
-import { ATOMS, type AtomDef } from "./atoms.ts"
+import { ATOMS, findAtom, type AtomDef } from "./atoms.ts"
 import { isCompatible, paramTypeToPortType, type PortType } from "./port-types.ts"
+
+const CONSTANT_VALUE_TYPE_FOR: Partial<Record<PortType, string>> = {
+  string: "string",
+  number: "number",
+  boolean: "boolean",
+  "image-ref": "image",
+  "ingress-host": "host",
+}
 
 /**
  * Direction of the drag the user just released:
@@ -20,6 +28,8 @@ export interface SuggestionTarget {
    *  - "param"  : an exposable param slot (used only in from-source mode)
    */
   kind: "input" | "output" | "param"
+  /** Optional params to seed the spawned node with (e.g. Constant.valueType). */
+  initialParams?: Record<string, unknown>
 }
 
 export function collectSuggestions(
@@ -59,5 +69,26 @@ export function collectSuggestions(
     if (best) matches.push(best)
   }
 
+  if (direction === "from-target") {
+    const constant = constantSuggestion(portType)
+    if (constant && !matches.some((m) => m.atom.type === "constant")) {
+      matches.push(constant)
+    }
+  }
+
   return matches
+}
+
+function constantSuggestion(portType: PortType): SuggestionTarget | null {
+  const valueType = CONSTANT_VALUE_TYPE_FOR[portType]
+  if (!valueType) return null
+  const atom = findAtom("constant")
+  if (!atom) return null
+  return {
+    atom,
+    handle: "value",
+    handleLabel: `value (${valueType})`,
+    kind: "output",
+    initialParams: { valueType },
+  }
 }

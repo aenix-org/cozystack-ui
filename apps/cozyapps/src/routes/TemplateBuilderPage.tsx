@@ -255,7 +255,7 @@ function BuilderInner() {
           position: pendingSpawn.flowPosition,
           data: {
             atomType: target.atom.type,
-            params: defaultParams(target.atom),
+            params: { ...defaultParams(target.atom), ...(target.initialParams ?? {}) },
             exposed: exposedParam,
             status: "idle",
           },
