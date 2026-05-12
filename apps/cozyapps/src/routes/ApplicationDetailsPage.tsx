@@ -1,10 +1,11 @@
-import { useState } from "react"
+import { useId, useRef, useState } from "react"
 import { Link, useParams } from "react-router"
 import { Archive, RefreshCw, Trash2 } from "lucide-react"
 import { Button, Section, StatusBadge } from "@cozystack/ui"
 import { addAction, findApplication, useApplications } from "../lib/mock-store.ts"
 import { applicationStatusTone } from "../lib/status.ts"
 import { formatDateTime } from "../lib/humanize.ts"
+import { nowIso } from "../lib/clock.ts"
 import { Breadcrumb } from "../components/Breadcrumb.tsx"
 import { DescriptionTable } from "../components/DescriptionTable.tsx"
 import { EnvironmentPill } from "../components/EnvironmentPill.tsx"
@@ -19,6 +20,8 @@ export function ApplicationDetailsPage() {
 
   const [backupOpen, setBackupOpen] = useState(false)
   const [backupName, setBackupName] = useState("")
+  const actionIdBase = useId()
+  const actionCounter = useRef(0)
 
   if (!app) {
     return (
@@ -32,12 +35,13 @@ export function ApplicationDetailsPage() {
   }
 
   const submitBackup = () => {
+    actionCounter.current += 1
     addAction({
-      id: `${app.name}-${Date.now()}`,
+      id: `${actionIdBase}-${actionCounter.current}`,
       name: backupName.trim() || "backup",
       applicationName: app.name,
       status: "Pending",
-      createdAt: new Date().toISOString(),
+      createdAt: nowIso(),
     })
     setBackupOpen(false)
     setBackupName("")
