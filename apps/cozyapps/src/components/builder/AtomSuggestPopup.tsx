@@ -3,13 +3,15 @@ import { cn } from "@cozystack/ui"
 import { PORT_TYPE, type PortType } from "../../lib/builder/port-types.ts"
 import {
   collectSuggestions,
+  type DragDirection,
   type SuggestionTarget,
 } from "../../lib/builder/suggestions.ts"
 
 interface AtomSuggestPopupProps {
   screenX: number
   screenY: number
-  sourcePortType: PortType
+  portType: PortType
+  direction: DragDirection
   onPick: (target: SuggestionTarget) => void
   onClose: () => void
 }
@@ -17,11 +19,15 @@ interface AtomSuggestPopupProps {
 export function AtomSuggestPopup({
   screenX,
   screenY,
-  sourcePortType,
+  portType,
+  direction,
   onPick,
   onClose,
 }: AtomSuggestPopupProps) {
-  const suggestions = useMemo(() => collectSuggestions(sourcePortType), [sourcePortType])
+  const suggestions = useMemo(
+    () => collectSuggestions(portType, direction),
+    [portType, direction],
+  )
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -31,6 +37,9 @@ export function AtomSuggestPopup({
     document.addEventListener("keydown", onKey)
     return () => document.removeEventListener("keydown", onKey)
   }, [onClose])
+
+  const verb = direction === "from-source" ? "Connect output" : "Find source for"
+  const arrow = direction === "from-source" ? "→" : "←"
 
   return (
     <>
@@ -42,23 +51,23 @@ export function AtomSuggestPopup({
       >
         <header className="border-b border-slate-100 px-3 py-2 text-xs">
           <div className="flex items-center gap-1.5 text-slate-500">
-            <span>Drop on</span>
+            <span>{verb}</span>
             <span
               className="inline-block size-2 rounded-full"
-              style={{ background: PORT_TYPE[sourcePortType].stroke }}
+              style={{ background: PORT_TYPE[portType].stroke }}
             />
-            <span className="font-medium text-slate-700">
-              {PORT_TYPE[sourcePortType].label}
-            </span>
+            <span className="font-medium text-slate-700">{PORT_TYPE[portType].label}</span>
           </div>
           <p className="mt-0.5 text-[11px] text-slate-400">
-            Pick an atom to spawn and connect
+            {direction === "from-source"
+              ? "Pick an atom to spawn and connect"
+              : "Pick an atom that can produce this value"}
           </p>
         </header>
         <div className="max-h-72 overflow-y-auto py-1">
           {suggestions.length === 0 ? (
             <p className="px-3 py-3 text-xs italic text-slate-400">
-              No atoms accept this port type.
+              No atoms match this port type.
             </p>
           ) : (
             suggestions.map((s) => {
@@ -83,7 +92,7 @@ export function AtomSuggestPopup({
                       {s.atom.displayName}
                     </div>
                     <div className="truncate text-[11px] text-slate-500">
-                      → {s.targetLabel}
+                      {arrow} {s.handleLabel}
                       {s.kind === "param" && (
                         <span className="ml-1 text-blue-600">(exposes param)</span>
                       )}

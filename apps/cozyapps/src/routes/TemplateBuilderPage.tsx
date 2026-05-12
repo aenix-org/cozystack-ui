@@ -30,7 +30,7 @@ import { AtomEdge } from "../components/builder/AtomEdge.tsx"
 import { AtomPalette } from "../components/builder/AtomPalette.tsx"
 import { AtomInspector } from "../components/builder/AtomInspector.tsx"
 import { AtomSuggestPopup } from "../components/builder/AtomSuggestPopup.tsx"
-import type { SuggestionTarget } from "../lib/builder/suggestions.ts"
+import type { DragDirection, SuggestionTarget } from "../lib/builder/suggestions.ts"
 import {
   PublishDialog,
   type PublishedTemplateDraft,
@@ -100,9 +100,10 @@ function BuilderInner() {
   const [publishOpen, setPublishOpen] = useState(false)
   const [running, setRunning] = useState(false)
   const [pendingSpawn, setPendingSpawn] = useState<{
-    sourceNodeId: string
-    sourceHandle: string
-    sourcePortType: PortType
+    originNodeId: string
+    originHandle: string
+    portType: PortType
+    direction: DragDirection
     screenX: number
     screenY: number
     flowPosition: { x: number; y: number }
@@ -111,6 +112,7 @@ function BuilderInner() {
     nodeId: string
     handleId: string
     portType: PortType
+    direction: DragDirection
   } | null>(null)
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
   const reactFlowWrapper = useRef<HTMLDivElement | null>(null)
@@ -176,14 +178,39 @@ function BuilderInner() {
     (_event, params) => {
       connectStart.current = null
       const { nodeId, handleId, handleType } = params
-      if (handleType !== "source" || !nodeId || !handleId) return
+      if (!nodeId || !handleId || !handleType) return
       const node = nodes.find((n) => n.id === nodeId)
       if (!node) return
       const atom = findAtom(node.data.atomType)
       if (!atom) return
-      const port = atom.outputs.find((p) => p.key === handleId)
-      if (!port) return
-      connectStart.current = { nodeId, handleId, portType: port.type }
+
+      if (handleType === "source") {
+        const port = atom.outputs.find((p) => p.key === handleId)
+        if (!port) return
+        connectStart.current = {
+          nodeId,
+          handleId,
+          portType: port.type,
+          direction: "from-source",
+        }
+      } else {
+        let portType: PortType | undefined
+        if (isParamHandle(handleId)) {
+          const paramKey = paramKeyFromHandle(handleId)
+          const param = atom.params.find((p) => p.key === paramKey)
+          if (param) portType = paramTypeToPortType(param.type)
+        } else {
+          const port = atom.inputs.find((p) => p.key === handleId)
+          if (port) portType = port.type
+        }
+        if (!portType) return
+        connectStart.current = {
+          nodeId,
+          handleId,
+          portType,
+          direction: "from-target",
+        }
+      }
     },
     [nodes],
   )
@@ -199,9 +226,10 @@ function BuilderInner() {
     if (clientX == null || clientY == null) return
     const flowPosition = rfInstance.current.screenToFlowPosition({ x: clientX, y: clientY })
     setPendingSpawn({
-      sourceNodeId: ctx.nodeId,
-      sourceHandle: ctx.handleId,
-      sourcePortType: ctx.portType,
+      originNodeId: ctx.nodeId,
+      originHandle: ctx.handleId,
+      portType: ctx.portType,
+      direction: ctx.direction,
       screenX: clientX,
       screenY: clientY,
       flowPosition,
@@ -213,6 +241,7 @@ function BuilderInner() {
       if (!pendingSpawn) return
       setNodes((current) => {
         const id = makeNodeId(target.atom.type, current)
+        const exposedParam = target.kind === "param" ? [target.handle] : []
         const newNode: BuilderNode = {
           id,
           type: "atom",
@@ -220,22 +249,38 @@ function BuilderInner() {
           data: {
             atomType: target.atom.type,
             params: defaultParams(target.atom),
-            exposed: target.kind === "param" ? [target.targetHandle] : [],
+            exposed: exposedParam,
             status: "idle",
           },
         }
-        const targetHandle =
-          target.kind === "param" ? paramHandleId(target.targetHandle) : target.targetHandle
-        const newEdge: Edge = {
-          id: `${pendingSpawn.sourceNodeId}:${pendingSpawn.sourceHandle}->${id}:${targetHandle}`,
-          source: pendingSpawn.sourceNodeId,
-          sourceHandle: pendingSpawn.sourceHandle,
-          target: id,
-          targetHandle,
-          type: "atom",
-          data: { portType: pendingSpawn.sourcePortType },
-          markerEnd: ATOM_EDGE_MARKERS,
+
+        let newEdge: Edge
+        if (pendingSpawn.direction === "from-source") {
+          const targetHandle =
+            target.kind === "param" ? paramHandleId(target.handle) : target.handle
+          newEdge = {
+            id: `${pendingSpawn.originNodeId}:${pendingSpawn.originHandle}->${id}:${targetHandle}`,
+            source: pendingSpawn.originNodeId,
+            sourceHandle: pendingSpawn.originHandle,
+            target: id,
+            targetHandle,
+            type: "atom",
+            data: { portType: pendingSpawn.portType },
+            markerEnd: ATOM_EDGE_MARKERS,
+          }
+        } else {
+          newEdge = {
+            id: `${id}:${target.handle}->${pendingSpawn.originNodeId}:${pendingSpawn.originHandle}`,
+            source: id,
+            sourceHandle: target.handle,
+            target: pendingSpawn.originNodeId,
+            targetHandle: pendingSpawn.originHandle,
+            type: "atom",
+            data: { portType: pendingSpawn.portType },
+            markerEnd: ATOM_EDGE_MARKERS,
+          }
         }
+
         setEdges((eds) => [...eds, newEdge])
         return [...current, newNode]
       })
@@ -563,7 +608,8 @@ function BuilderInner() {
         <AtomSuggestPopup
           screenX={pendingSpawn.screenX}
           screenY={pendingSpawn.screenY}
-          sourcePortType={pendingSpawn.sourcePortType}
+          portType={pendingSpawn.portType}
+          direction={pendingSpawn.direction}
           onPick={spawnFromSuggestion}
           onClose={() => setPendingSpawn(null)}
         />
