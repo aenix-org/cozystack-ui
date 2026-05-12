@@ -1,7 +1,6 @@
 import { useMemo } from "react"
 import { Link, useParams } from "react-router"
-import { Copy, Download, Globe, Server, ShieldCheck } from "lucide-react"
-import { Button, Section, StatusBadge, cn } from "@cozystack/ui"
+import { Section, StatusBadge, cn } from "@cozystack/ui"
 import { useApplications, useEnvironments } from "../lib/mock-store.ts"
 import { environmentStatusTone } from "../lib/status.ts"
 import { timeAgo } from "../lib/humanize.ts"
@@ -14,13 +13,18 @@ import { ResourcePill } from "../components/ResourcePill.tsx"
 import { ApplicationCard } from "../components/ApplicationCard.tsx"
 import { NodesTable } from "../components/NodesTable.tsx"
 import { EventsTimeline } from "../components/EventsTimeline.tsx"
+import { LoadBalancersTable } from "../components/LoadBalancersTable.tsx"
+import { IngressesTable } from "../components/IngressesTable.tsx"
 
 export function EnvironmentDetailsPage() {
   const { name } = useParams<{ name: string }>()
   const environments = useEnvironments()
   const apps = useApplications()
   const env = environments.find((e) => e.name === name)
-  const details = useMemo(() => (env ? generateEnvDetails(env) : null), [env])
+  const details = useMemo(
+    () => (env ? generateEnvDetails(env, apps) : null),
+    [env, apps],
+  )
 
   if (!env || !details) {
     return (
@@ -34,7 +38,7 @@ export function EnvironmentDetailsPage() {
   }
 
   const envApps = apps.filter((a) => a.environment === env.name)
-  const { capacity, nodes, network, events, k8sVersion } = details
+  const { capacity, nodes, loadBalancers, ingresses, events, k8sVersion } = details
 
   return (
     <div className="relative p-6">
@@ -116,92 +120,26 @@ export function EnvironmentDetailsPage() {
           )}
         </Section>
 
-        <Section title="Network & Access">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
-              <NetworkField
-                icon={<Globe className="size-3.5 text-slate-400" />}
-                label="Load balancer"
-                value={network.lbAddress}
-              />
-              <NetworkField
-                icon={<Server className="size-3.5 text-slate-400" />}
-                label="Wildcard domain"
-                value={network.wildcardDomain}
-              />
-              <NetworkField
-                icon={
-                  <ShieldCheck
-                    className={cn(
-                      "size-3.5",
-                      network.tlsIssuerOk ? "text-emerald-500" : "text-amber-500",
-                    )}
-                  />
-                }
-                label="TLS issuer"
-                value={network.tlsIssuer}
-                hint={network.tlsIssuerOk ? "ready" : "rate-limited"}
-              />
-              <NetworkField
-                icon={<Globe className="size-3.5 text-slate-400" />}
-                label="Egress IP"
-                value={network.egressIp}
-              />
-            </div>
-            <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                kubectl access
-              </div>
-              <div className="rounded-md border border-slate-200 bg-slate-900 p-3 font-mono text-[11px] text-slate-100">
-                <div className="text-slate-500"># Use this context</div>
-                <div>kubectl --context {network.kubectlContext} get pods</div>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="primary" size="sm">
-                  <Download className="size-3.5" />
-                  Download kubeconfig
-                </Button>
-                <Button variant="outline" size="sm">
-                  <Copy className="size-3.5" />
-                  Copy command
-                </Button>
-              </div>
-              <p className="text-[11px] text-slate-500">
-                kubeconfig path: <span className="font-mono">{network.kubeconfigPath}</span>
-              </p>
-            </div>
-          </div>
+        <Section
+          title="Load Balancers"
+          description="Services of type LoadBalancer exposed in this environment"
+          actions={<span className="text-xs text-slate-500">{loadBalancers.length}</span>}
+        >
+          <LoadBalancersTable lbs={loadBalancers} />
+        </Section>
+
+        <Section
+          title="Ingresses"
+          description="HTTP/S routes admitted by the ingress controller"
+          actions={<span className="text-xs text-slate-500">{ingresses.length}</span>}
+        >
+          <IngressesTable ingresses={ingresses} />
         </Section>
 
         <Section title="Events" description="Recent activity in the environment">
           <EventsTimeline events={events} />
         </Section>
       </div>
-    </div>
-  )
-}
-
-function NetworkField({
-  icon,
-  label,
-  value,
-  hint,
-}: {
-  icon: React.ReactNode
-  label: string
-  value: string
-  hint?: string
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="shrink-0">{icon}</span>
-      <span className="w-32 shrink-0 text-[11px] font-medium uppercase tracking-wider text-slate-500">
-        {label}
-      </span>
-      <span className="flex-1 truncate font-mono text-sm text-slate-900">{value}</span>
-      {hint && (
-        <span className="shrink-0 text-[11px] text-slate-500 italic">{hint}</span>
-      )}
     </div>
   )
 }

@@ -28,14 +28,30 @@ export interface EnvCapacity {
   podsCapacity: number
 }
 
-export interface EnvNetwork {
-  lbAddress: string
-  wildcardDomain: string
-  tlsIssuer: string
-  tlsIssuerOk: boolean
-  egressIp: string
-  kubeconfigPath: string
-  kubectlContext: string
+export type LbProtocol = "TCP" | "UDP" | "TCP+UDP"
+export type LbStatus = "Active" | "Pending" | "Failed"
+export type IngressStatus = "Admitted" | "Pending" | "Failed"
+
+export interface LoadBalancerInfo {
+  name: string
+  externalIp: string
+  protocol: LbProtocol
+  ports: string
+  backendApp: string
+  status: LbStatus
+  age: string
+}
+
+export interface IngressInfo {
+  name: string
+  host: string
+  paths: string
+  backendApp: string
+  tls: boolean
+  ingressClass: string
+  address: string
+  status: IngressStatus
+  age: string
 }
 
 export type EventKind =
@@ -60,7 +76,8 @@ export interface EnvDetails {
   k8sVersion: string
   capacity: EnvCapacity
   nodes: NodeInfo[]
-  network: EnvNetwork
+  loadBalancers: LoadBalancerInfo[]
+  ingresses: IngressInfo[]
   events: EnvEvent[]
 }
 
@@ -94,7 +111,6 @@ function round(n: number, digits = 2): number {
 }
 
 const K8S_VERSIONS = ["v1.29.3", "v1.30.1", "v1.30.2"]
-const REGIONS = ["eu-central-1", "eu-west-1"]
 
 const EVENT_TEMPLATES: { kind: EventKind; title: string; detail?: string }[] = [
   {
@@ -144,10 +160,32 @@ const EVENT_TEMPLATES: { kind: EventKind; title: string; detail?: string }[] = [
   },
 ]
 
-export function generateEnvDetails(env: Environment): EnvDetails {
+interface AppLike {
+  name: string
+  templateSlug: string
+  environment: string
+}
+
+const INGRESS_TEMPLATES = new Set([
+  "wordpress",
+  "drupal",
+  "ghost",
+  "nodejs",
+  "nextjs",
+  "static",
+])
+
+const LB_TEMPLATES: Record<string, { protocol: LbProtocol; ports: string }> = {
+  minecraft: { protocol: "TCP", ports: "25565/TCP" },
+  cs2: { protocol: "TCP+UDP", ports: "27015/TCP, 27015/UDP" },
+}
+
+export function generateEnvDetails(env: Environment, apps: AppLike[] = []): EnvDetails {
   const rng = seedFrom(`${env.name}:env-details`)
   const k8sVersion = K8S_VERSIONS[Math.floor(rng() * K8S_VERSIONS.length)]
-  const region = REGIONS[Math.floor(rng() * REGIONS.length)]
+  // Burn an RNG step to keep downstream values stable with earlier seed flow.
+  rng()
+  const envApps = apps.filter((a) => a.environment === env.name)
 
   const nodes: NodeInfo[] = []
   const cpResv = 2
@@ -194,15 +232,36 @@ export function generateEnvDetails(env: Environment): EnvDetails {
   const podsUsed = nodes.reduce((s, n) => s + n.pods, 0)
   const podsCapacity = nodes.reduce((s, n) => s + n.podCapacity, 0)
 
-  const tier = env.name
-  const network: EnvNetwork = {
-    lbAddress: `203.0.113.${rangeInt(rng, 10, 240)}`,
-    wildcardDomain: `*.${tier}.example.com`,
-    tlsIssuer: "letsencrypt-prod",
-    tlsIssuerOk: rng() > 0.05,
-    egressIp: `198.51.100.${rangeInt(rng, 10, 240)}`,
-    kubeconfigPath: `~/.kube/${env.name}.kubeconfig`,
-    kubectlContext: `${env.name}@${region}`,
+  const loadBalancers: LoadBalancerInfo[] = []
+  const ingresses: IngressInfo[] = []
+  for (const app of envApps) {
+    if (INGRESS_TEMPLATES.has(app.templateSlug)) {
+      const tlsOk = rng() > 0.05
+      const admitted = rng() > 0.08
+      ingresses.push({
+        name: app.name,
+        host: `${app.name}.${env.name}.example.com`,
+        paths: "/",
+        backendApp: app.name,
+        tls: tlsOk,
+        ingressClass: "nginx",
+        address: `203.0.113.${rangeInt(rng, 10, 240)}`,
+        status: admitted ? "Admitted" : "Pending",
+        age: nodeAge(rng),
+      })
+    }
+    if (LB_TEMPLATES[app.templateSlug]) {
+      const tpl = LB_TEMPLATES[app.templateSlug]
+      loadBalancers.push({
+        name: `${app.name}-lb`,
+        externalIp: `203.0.113.${rangeInt(rng, 10, 240)}`,
+        protocol: tpl.protocol,
+        ports: tpl.ports,
+        backendApp: app.name,
+        status: rng() > 0.05 ? "Active" : "Pending",
+        age: nodeAge(rng),
+      })
+    }
   }
 
   const eventsCount = 12
@@ -233,7 +292,8 @@ export function generateEnvDetails(env: Environment): EnvDetails {
       podsCapacity,
     },
     nodes,
-    network,
+    loadBalancers,
+    ingresses,
     events,
   }
 }
