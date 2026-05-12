@@ -8,6 +8,7 @@ import { TemplateDetailsPage } from "./routes/TemplateDetailsPage.tsx"
 import { TemplateBuilderPage } from "./routes/TemplateBuilderPage.tsx"
 import { LaunchFormPage } from "./routes/LaunchFormPage.tsx"
 import { EnvironmentsPage } from "./routes/EnvironmentsPage.tsx"
+import { EnvironmentDetailsPage } from "./routes/EnvironmentDetailsPage.tsx"
 import { EnvironmentCreatePage } from "./routes/EnvironmentCreatePage.tsx"
 
 const TABS: HeaderTab[] = [
@@ -32,6 +33,7 @@ export default function App() {
         <Route path="/store/:template/launch" element={<LaunchFormPage />} />
         <Route path="/environments" element={<EnvironmentsPage />} />
         <Route path="/environments/create" element={<EnvironmentCreatePage />} />
+        <Route path="/environments/:name" element={<EnvironmentDetailsPage />} />
       </Routes>
     </AppShell>
   )

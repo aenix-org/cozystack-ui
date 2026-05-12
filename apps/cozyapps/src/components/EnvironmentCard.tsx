@@ -1,3 +1,4 @@
+import { Link } from "react-router"
 import { MoreHorizontal } from "lucide-react"
 import { Button, StatusBadge, cn } from "@cozystack/ui"
 import type { Application, Environment } from "../lib/types.ts"
@@ -17,7 +18,12 @@ export function EnvironmentCard({ env, apps }: EnvironmentCardProps) {
     <div className="relative flex flex-col gap-3 overflow-hidden rounded-lg border border-slate-200 bg-white p-4 pl-5">
       <span className={cn("absolute left-0 top-0 h-full w-1", tierBarClass(env.name))} />
       <div className="flex items-center gap-2">
-        <span className="flex-1 font-mono text-sm font-medium text-slate-900">{env.name}</span>
+        <Link
+          to={`/environments/${env.name}`}
+          className="flex-1 truncate font-mono text-sm font-medium text-slate-900 hover:text-blue-700"
+        >
+          {env.name}
+        </Link>
         <StatusBadge tone={environmentStatusTone(env.status)}>{env.status}</StatusBadge>
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -45,9 +51,11 @@ export function EnvironmentCard({ env, apps }: EnvironmentCardProps) {
 
       <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
         <span className="flex-1 text-xs text-slate-400">Created {timeAgo(env.createdAt)}</span>
-        <Button size="sm" variant="outline">
-          Manage
-        </Button>
+        <Link to={`/environments/${env.name}`}>
+          <Button size="sm" variant="outline">
+            Manage
+          </Button>
+        </Link>
         <Button size="sm" variant="ghost" aria-label="More actions">
           <MoreHorizontal className="size-4" />
         </Button>
