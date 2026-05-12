@@ -23,10 +23,7 @@ import { MetricStatCard } from "../components/MetricStatCard.tsx"
 import { UsageBar } from "../components/UsageBar.tsx"
 import { Sparkline } from "../components/Sparkline.tsx"
 import { LogsViewer } from "../components/LogsViewer.tsx"
-import {
-  ReconcileRunsTimeline,
-  SyncStateBadge,
-} from "../components/ReconcileRunsTimeline.tsx"
+import { ChangesTimeline, SyncStateBadge } from "../components/ChangesTimeline.tsx"
 
 export function ApplicationDetailsPage() {
   // Subscribe to the store so mutations (status changes, new actions) re-render.
@@ -182,16 +179,19 @@ export function ApplicationDetailsPage() {
         </Section>
 
         <Section
-          title="Reconcile Runs"
-          description="Every change — spec, drift, or upstream output — runs through one reconcile workflow"
+          title="Changes"
+          description="Every spec edit, drift fix and upstream output bump shows up here"
           actions={
             <span className="text-xs text-slate-500">
-              {metrics.reconcileRuns.filter((r) => r.result === "changed").length} changed ·{" "}
-              {metrics.reconcileRuns.filter((r) => r.result === "noop").length} noop
+              <span className="font-medium text-slate-700">
+                {metrics.reconcileRuns.filter((r) => r.result === "changed").length}
+              </span>{" "}
+              changes ·{" "}
+              {metrics.reconcileRuns.filter((r) => r.result === "noop").length} no-op
             </span>
           }
         >
-          <ReconcileRunsTimeline runs={metrics.reconcileRuns} />
+          <ChangesTimeline runs={metrics.reconcileRuns} />
         </Section>
 
         <Section title="Logs">

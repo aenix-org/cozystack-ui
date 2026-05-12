@@ -51,15 +51,13 @@ function formatDuration(ms: number): string {
   return `${Math.round(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`
 }
 
-interface ReconcileRunsTimelineProps {
+interface ChangesTimelineProps {
   runs: ReconcileRun[]
 }
 
-export function ReconcileRunsTimeline({ runs }: ReconcileRunsTimelineProps) {
+export function ChangesTimeline({ runs }: ChangesTimelineProps) {
   if (runs.length === 0) {
-    return (
-      <p className="text-sm italic text-slate-400">No reconcile runs yet.</p>
-    )
+    return <p className="text-sm italic text-slate-400">No changes yet.</p>
   }
   return (
     <ul className="flex flex-col">
