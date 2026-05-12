@@ -18,14 +18,14 @@ export function presetWordpress(): PresetGraph {
       position: { x: 0, y: 0 },
       data: {
         atomType: "user-input",
-        params: { fields: "site title, domain, admin email" },
+        params: { fields: "host, name, image" },
         ...idle,
       },
     },
     {
       id: "db",
       type: "atom",
-      position: { x: 320, y: -120 },
+      position: { x: 360, y: -160 },
       data: {
         atomType: "postgres",
         params: { version: "15", storage: "10 GB", replicas: 1 },
@@ -35,7 +35,7 @@ export function presetWordpress(): PresetGraph {
     {
       id: "cache",
       type: "atom",
-      position: { x: 320, y: 120 },
+      position: { x: 360, y: 120 },
       data: {
         atomType: "redis",
         params: { memory: "1 GB", persistence: false },
@@ -45,7 +45,7 @@ export function presetWordpress(): PresetGraph {
     {
       id: "app",
       type: "atom",
-      position: { x: 640, y: 0 },
+      position: { x: 740, y: -20 },
       data: {
         atomType: "container",
         params: { image: "wordpress:6.4", port: 80, replicas: 2 },
@@ -55,7 +55,7 @@ export function presetWordpress(): PresetGraph {
     {
       id: "tls",
       type: "atom",
-      position: { x: 960, y: -120 },
+      position: { x: 1120, y: -180 },
       data: {
         atomType: "tls-cert",
         params: { issuer: "letsencrypt-prod" },
@@ -65,7 +65,7 @@ export function presetWordpress(): PresetGraph {
     {
       id: "ingress",
       type: "atom",
-      position: { x: 960, y: 120 },
+      position: { x: 1120, y: 80 },
       data: {
         atomType: "ingress",
         params: { path: "/", rateLimit: 100 },
@@ -75,7 +75,7 @@ export function presetWordpress(): PresetGraph {
     {
       id: "out",
       type: "atom",
-      position: { x: 1280, y: 120 },
+      position: { x: 1480, y: 80 },
       data: {
         atomType: "output",
         params: { label: "Public URL" },
@@ -86,49 +86,49 @@ export function presetWordpress(): PresetGraph {
 
   const edges: Edge[] = [
     {
-      id: "db->app",
+      id: "db-secret->app",
       source: "db",
       target: "app",
-      sourceHandle: "conn",
-      targetHandle: "db",
+      sourceHandle: "credentials",
+      targetHandle: "envFromSecret",
       type: "atom",
-      data: { portType: "postgres-conn" },
+      data: { portType: "secret-ref" },
     },
     {
-      id: "cache->app",
+      id: "cache-secret->app",
       source: "cache",
       target: "app",
-      sourceHandle: "conn",
-      targetHandle: "cache",
+      sourceHandle: "credentials",
+      targetHandle: "envFromSecret",
       type: "atom",
-      data: { portType: "redis-conn" },
+      data: { portType: "secret-ref" },
     },
     {
-      id: "input->tls",
+      id: "input-host->tls",
       source: "input",
       target: "tls",
-      sourceHandle: "domain",
-      targetHandle: "domain",
+      sourceHandle: "host",
+      targetHandle: "host",
       type: "atom",
-      data: { portType: "domain" },
+      data: { portType: "ingress-host" },
     },
     {
-      id: "app->ingress",
+      id: "app-svc->ingress",
       source: "app",
       target: "ingress",
       sourceHandle: "service",
-      targetHandle: "service",
+      targetHandle: "backend",
       type: "atom",
       data: { portType: "service-ref" },
     },
     {
-      id: "input->ingress",
+      id: "input-host->ingress",
       source: "input",
       target: "ingress",
-      sourceHandle: "domain",
-      targetHandle: "domain",
+      sourceHandle: "host",
+      targetHandle: "host",
       type: "atom",
-      data: { portType: "domain" },
+      data: { portType: "ingress-host" },
     },
     {
       id: "tls->ingress",
@@ -137,7 +137,7 @@ export function presetWordpress(): PresetGraph {
       sourceHandle: "secret",
       targetHandle: "tls",
       type: "atom",
-      data: { portType: "secret-ref" },
+      data: { portType: "tls-secret-ref" },
     },
     {
       id: "ingress->out",
@@ -146,7 +146,7 @@ export function presetWordpress(): PresetGraph {
       sourceHandle: "url",
       targetHandle: "value",
       type: "atom",
-      data: { portType: "url" },
+      data: { portType: "string" },
     },
   ]
 

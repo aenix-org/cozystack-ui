@@ -120,7 +120,17 @@ function AtomNodeContent({ atom, status, exposed, selected }: AtomNodeContentPro
               id={port.key}
               style={handleStyle(port.type, PORT_ROW_H / 2)}
             />
-            <span className="ml-3 truncate">{port.label}</span>
+            <span className="ml-3 flex min-w-0 items-center gap-1 truncate">
+              {port.label}
+              {port.multi && (
+                <span
+                  className="rounded-sm bg-slate-200 px-1 font-mono text-[9px] leading-tight text-slate-600"
+                  title="Accepts multiple incoming connections"
+                >
+                  N
+                </span>
+              )}
+            </span>
             <span className="ml-auto mr-3 font-mono text-[10px] uppercase tracking-wide text-slate-300">
               {PORT_TYPE[port.type].label}
             </span>

@@ -4,13 +4,16 @@ import {
   Box,
   Container,
   Database,
+  FileText,
   FormInput,
   Globe,
   HardDrive,
   KeyRound,
   Layers,
+  Network,
   Package,
   ShieldCheck,
+  UserCircle2,
 } from "lucide-react"
 import type { ParamDef } from "../types.ts"
 import type { PortType } from "./port-types.ts"
@@ -19,62 +22,72 @@ export interface PortDef {
   key: string
   label: string
   type: PortType
+  /** Accept many incoming/outgoing connections — k8s envFrom-style fan-in. */
+  multi?: boolean
 }
 
-export type AtomCategory = "Inputs" | "Storage" | "Compute" | "Network" | "Secrets" | "Outputs"
+export type AtomCategory =
+  | "Inputs"
+  | "Managed Services"
+  | "K8s Primitives"
+  | "Compute"
+  | "Network"
+  | "Outputs"
 
 export interface AtomDef {
-  /** Stable identifier used as React Flow `node.type`. */
   type: string
   displayName: string
   category: AtomCategory
   description: string
   icon: LucideIcon
-  /** Soft background tint, applied to the node header. */
   accentBg: string
-  /** Solid color, used for icon and category tag. */
   accentFg: string
   inputs: PortDef[]
   outputs: PortDef[]
-  /** Configurable parameters surfaced in the inspector. */
   params: ParamDef[]
 }
 
 export const ATOMS: AtomDef[] = [
+  // ─── Inputs ────────────────────────────────────────────────────────────
   {
     type: "user-input",
     displayName: "User Input",
     category: "Inputs",
-    description: "Values the user fills in when launching the app",
+    description: "Values the launching user fills in via the deploy form",
     icon: FormInput,
     accentBg: "bg-slate-100",
     accentFg: "text-slate-700",
     inputs: [],
     outputs: [
+      { key: "host", label: "host", type: "ingress-host" },
       { key: "name", label: "name", type: "string" },
-      { key: "domain", label: "domain", type: "domain" },
-      { key: "size", label: "size", type: "string" },
+      { key: "image", label: "image", type: "image-ref" },
     ],
     params: [
       {
         key: "fields",
         label: "Field list",
         type: "string",
-        defaultValue: "name, domain, size",
-        hint: "Comma-separated form fields exposed to the launching user",
+        defaultValue: "host, name, image",
+        hint: "Comma-separated form fields presented to the user",
       },
     ],
   },
+
+  // ─── Managed Services (high-level — render k8s primitives under the hood) ─
   {
     type: "postgres",
     displayName: "Postgres",
-    category: "Storage",
-    description: "Managed PostgreSQL instance with daily backups",
+    category: "Managed Services",
+    description: "Managed PostgreSQL cluster — emits a Secret with credentials and a Service",
     icon: Database,
     accentBg: "bg-blue-50",
     accentFg: "text-blue-600",
     inputs: [],
-    outputs: [{ key: "conn", label: "connection", type: "postgres-conn" }],
+    outputs: [
+      { key: "credentials", label: "credentials", type: "secret-ref" },
+      { key: "service", label: "service", type: "service-ref" },
+    ],
     params: [
       {
         key: "version",
@@ -96,13 +109,16 @@ export const ATOMS: AtomDef[] = [
   {
     type: "redis",
     displayName: "Redis",
-    category: "Storage",
-    description: "In-memory key-value cache",
+    category: "Managed Services",
+    description: "Managed Redis — emits a Secret with password and a Service",
     icon: Database,
     accentBg: "bg-red-50",
     accentFg: "text-red-600",
     inputs: [],
-    outputs: [{ key: "conn", label: "connection", type: "redis-conn" }],
+    outputs: [
+      { key: "credentials", label: "credentials", type: "secret-ref" },
+      { key: "service", label: "service", type: "service-ref" },
+    ],
     params: [
       {
         key: "memory",
@@ -116,14 +132,17 @@ export const ATOMS: AtomDef[] = [
   },
   {
     type: "s3-bucket",
-    displayName: "S3 Bucket",
-    category: "Storage",
-    description: "Object storage with S3-compatible API",
+    displayName: "S3 / MinIO Bucket",
+    category: "Managed Services",
+    description: "Object storage — emits a Secret with access keys and a Service endpoint",
     icon: HardDrive,
     accentBg: "bg-orange-50",
     accentFg: "text-orange-600",
     inputs: [],
-    outputs: [{ key: "creds", label: "credentials", type: "s3-creds" }],
+    outputs: [
+      { key: "credentials", label: "credentials", type: "secret-ref" },
+      { key: "service", label: "service", type: "service-ref" },
+    ],
     params: [
       {
         key: "region",
@@ -132,55 +151,170 @@ export const ATOMS: AtomDef[] = [
         options: ["eu-central-1", "eu-west-1", "us-east-1"],
         defaultValue: "eu-central-1",
       },
+      { key: "versioning", label: "Versioning", type: "boolean", defaultValue: true },
+    ],
+  },
+
+  // ─── K8s Primitives ───────────────────────────────────────────────────
+  {
+    type: "secret",
+    displayName: "Secret",
+    category: "K8s Primitives",
+    description: "Opaque Kubernetes Secret with arbitrary key/value pairs",
+    icon: KeyRound,
+    accentBg: "bg-pink-50",
+    accentFg: "text-pink-600",
+    inputs: [],
+    outputs: [{ key: "ref", label: "ref", type: "secret-ref" }],
+    params: [
+      { key: "name", label: "Name", type: "string", placeholder: "my-secret", required: true },
       {
-        key: "versioning",
-        label: "Versioning",
-        type: "boolean",
-        defaultValue: true,
+        key: "keys",
+        label: "Keys",
+        type: "string",
+        placeholder: "username, password",
+        hint: "Comma-separated list of keys held by this Secret",
       },
     ],
   },
   {
+    type: "configmap",
+    displayName: "ConfigMap",
+    category: "K8s Primitives",
+    description: "Non-sensitive configuration data mounted as env or files",
+    icon: FileText,
+    accentBg: "bg-cyan-50",
+    accentFg: "text-cyan-600",
+    inputs: [],
+    outputs: [{ key: "ref", label: "ref", type: "configmap-ref" }],
+    params: [
+      { key: "name", label: "Name", type: "string", placeholder: "app-config", required: true },
+      {
+        key: "keys",
+        label: "Keys",
+        type: "string",
+        placeholder: "LOG_LEVEL, FEATURE_X",
+        hint: "Comma-separated list of keys",
+      },
+    ],
+  },
+  {
+    type: "pvc",
+    displayName: "PersistentVolumeClaim",
+    category: "K8s Primitives",
+    description: "Persistent storage volume",
+    icon: HardDrive,
+    accentBg: "bg-orange-50",
+    accentFg: "text-orange-600",
+    inputs: [],
+    outputs: [{ key: "claim", label: "claim", type: "pvc-ref" }],
+    params: [
+      { key: "name", label: "Name", type: "string", placeholder: "data", required: true },
+      {
+        key: "size",
+        label: "Size",
+        type: "enum",
+        options: ["1 GB", "10 GB", "50 GB", "100 GB", "500 GB"],
+        defaultValue: "10 GB",
+      },
+      {
+        key: "storageClass",
+        label: "Storage class",
+        type: "string",
+        placeholder: "standard",
+      },
+      {
+        key: "accessMode",
+        label: "Access mode",
+        type: "enum",
+        options: ["ReadWriteOnce", "ReadOnlyMany", "ReadWriteMany"],
+        defaultValue: "ReadWriteOnce",
+      },
+    ],
+  },
+  {
+    type: "service-account",
+    displayName: "ServiceAccount",
+    category: "K8s Primitives",
+    description: "Identity for pods to authenticate against the API",
+    icon: UserCircle2,
+    accentBg: "bg-yellow-50",
+    accentFg: "text-yellow-600",
+    inputs: [],
+    outputs: [{ key: "sa", label: "sa", type: "serviceaccount-ref" }],
+    params: [
+      {
+        key: "name",
+        label: "Name",
+        type: "string",
+        placeholder: "workload-sa",
+        required: true,
+      },
+    ],
+  },
+  {
+    type: "service",
+    displayName: "Service",
+    category: "K8s Primitives",
+    description: "Cluster-internal endpoint for a workload",
+    icon: Network,
+    accentBg: "bg-emerald-50",
+    accentFg: "text-emerald-600",
+    inputs: [],
+    outputs: [{ key: "ref", label: "ref", type: "service-ref" }],
+    params: [
+      { key: "name", label: "Name", type: "string", placeholder: "backend", required: true },
+      { key: "port", label: "Port", type: "number", defaultValue: 8080 },
+      {
+        key: "type",
+        label: "Type",
+        type: "enum",
+        options: ["ClusterIP", "NodePort", "LoadBalancer"],
+        defaultValue: "ClusterIP",
+      },
+    ],
+  },
+
+  // ─── Compute ──────────────────────────────────────────────────────────
+  {
     type: "container",
     displayName: "Container",
     category: "Compute",
-    description: "Long-running container with auto-restart",
+    description: "Deployment — pulls envs from Secrets/ConfigMaps and mounts PVCs",
     icon: Container,
     accentBg: "bg-emerald-50",
     accentFg: "text-emerald-600",
     inputs: [
-      { key: "db", label: "database", type: "postgres-conn" },
-      { key: "cache", label: "cache", type: "redis-conn" },
-      { key: "storage", label: "storage", type: "s3-creds" },
+      { key: "image", label: "image", type: "image-ref" },
+      { key: "envFromSecret", label: "envFrom (secret)", type: "secret-ref", multi: true },
+      { key: "envFromConfig", label: "envFrom (config)", type: "configmap-ref", multi: true },
+      { key: "volumes", label: "volumes", type: "pvc-ref", multi: true },
+      { key: "serviceAccount", label: "serviceAccount", type: "serviceaccount-ref" },
     ],
     outputs: [{ key: "service", label: "service", type: "service-ref" }],
     params: [
       {
         key: "image",
-        label: "Image",
+        label: "Image (literal)",
         type: "string",
         placeholder: "wordpress:6.4",
-        required: true,
+        hint: "Used when no image-ref is connected",
       },
       { key: "port", label: "Port", type: "number", defaultValue: 80 },
-      {
-        key: "replicas",
-        label: "Replicas",
-        type: "number",
-        defaultValue: 1,
-        hint: "Number of running instances",
-      },
+      { key: "replicas", label: "Replicas", type: "number", defaultValue: 1 },
     ],
   },
   {
     type: "helm-chart",
     displayName: "Helm Chart",
     category: "Compute",
-    description: "Install a Helm chart with custom values",
+    description: "Install a Helm chart — outputs the primary Service it creates",
     icon: Package,
     accentBg: "bg-emerald-50",
     accentFg: "text-emerald-600",
-    inputs: [{ key: "values", label: "values", type: "any" }],
+    inputs: [
+      { key: "values", label: "values", type: "any", multi: true },
+    ],
     outputs: [{ key: "service", label: "service", type: "service-ref" }],
     params: [
       {
@@ -193,35 +327,18 @@ export const ATOMS: AtomDef[] = [
       { key: "version", label: "Version", type: "string", placeholder: "17.0.4" },
     ],
   },
-  {
-    type: "ingress",
-    displayName: "Ingress",
-    category: "Network",
-    description: "HTTP/S router with rate limiting and TLS",
-    icon: Globe,
-    accentBg: "bg-indigo-50",
-    accentFg: "text-indigo-600",
-    inputs: [
-      { key: "service", label: "service", type: "service-ref" },
-      { key: "domain", label: "domain", type: "domain" },
-      { key: "tls", label: "tls cert", type: "secret-ref" },
-    ],
-    outputs: [{ key: "url", label: "public url", type: "url" }],
-    params: [
-      { key: "path", label: "Path prefix", type: "string", defaultValue: "/" },
-      { key: "rateLimit", label: "Rate limit (req/s)", type: "number", defaultValue: 100 },
-    ],
-  },
+
+  // ─── Network ──────────────────────────────────────────────────────────
   {
     type: "tls-cert",
     displayName: "TLS Cert",
     category: "Network",
-    description: "Let's Encrypt certificate via cert-manager",
+    description: "Issues a Let's Encrypt certificate as a kubernetes.io/tls Secret",
     icon: ShieldCheck,
-    accentBg: "bg-violet-50",
-    accentFg: "text-violet-600",
-    inputs: [{ key: "domain", label: "domain", type: "domain" }],
-    outputs: [{ key: "secret", label: "secret", type: "secret-ref" }],
+    accentBg: "bg-rose-50",
+    accentFg: "text-rose-600",
+    inputs: [{ key: "host", label: "host", type: "ingress-host" }],
+    outputs: [{ key: "secret", label: "secret", type: "tls-secret-ref" }],
     params: [
       {
         key: "issuer",
@@ -233,19 +350,26 @@ export const ATOMS: AtomDef[] = [
     ],
   },
   {
-    type: "secret",
-    displayName: "Secret",
-    category: "Secrets",
-    description: "Materialised Kubernetes Secret",
-    icon: KeyRound,
-    accentBg: "bg-pink-50",
-    accentFg: "text-pink-600",
-    inputs: [{ key: "value", label: "value", type: "any" }],
-    outputs: [{ key: "ref", label: "ref", type: "secret-ref" }],
+    type: "ingress",
+    displayName: "Ingress",
+    category: "Network",
+    description: "HTTP/S router — accepts a backend Service, a host and a TLS Secret",
+    icon: Globe,
+    accentBg: "bg-indigo-50",
+    accentFg: "text-indigo-600",
+    inputs: [
+      { key: "backend", label: "backend", type: "service-ref" },
+      { key: "host", label: "host", type: "ingress-host" },
+      { key: "tls", label: "tls", type: "tls-secret-ref" },
+    ],
+    outputs: [{ key: "url", label: "public url", type: "string" }],
     params: [
-      { key: "name", label: "Name", type: "string", placeholder: "db-credentials", required: true },
+      { key: "path", label: "Path prefix", type: "string", defaultValue: "/" },
+      { key: "rateLimit", label: "Rate limit (req/s)", type: "number", defaultValue: 100 },
     ],
   },
+
+  // ─── Outputs ──────────────────────────────────────────────────────────
   {
     type: "output",
     displayName: "Application Output",
@@ -264,19 +388,19 @@ export const ATOMS: AtomDef[] = [
 
 export const CATEGORY_ORDER: AtomCategory[] = [
   "Inputs",
-  "Storage",
+  "Managed Services",
+  "K8s Primitives",
   "Compute",
   "Network",
-  "Secrets",
   "Outputs",
 ]
 
 const CATEGORY_ICONS: Record<AtomCategory, LucideIcon> = {
   Inputs: FormInput,
-  Storage: Database,
-  Compute: Box,
+  "Managed Services": Database,
+  "K8s Primitives": Box,
+  Compute: Container,
   Network: Globe,
-  Secrets: KeyRound,
   Outputs: Layers,
 }
 

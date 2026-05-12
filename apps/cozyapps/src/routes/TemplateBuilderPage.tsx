@@ -135,6 +135,7 @@ function BuilderInner() {
       if (!sourcePort) return
 
       let targetType
+      let isMulti = false
       if (isParamHandle(connection.targetHandle)) {
         const paramKey = paramKeyFromHandle(connection.targetHandle as string)
         const exposed = targetNode.data.exposed ?? []
@@ -146,20 +147,27 @@ function BuilderInner() {
         const port = targetAtom.inputs.find((p) => p.key === connection.targetHandle)
         if (!port) return
         targetType = port.type
+        isMulti = !!port.multi
       }
 
       if (!isCompatible(sourcePort.type, targetType)) return
-      setEdges((eds) =>
-        addEdge(
+      setEdges((eds) => {
+        const filtered = isMulti
+          ? eds
+          : eds.filter(
+              (e) =>
+                !(e.target === connection.target && e.targetHandle === connection.targetHandle),
+            )
+        return addEdge(
           {
             ...connection,
             type: "atom",
             data: { portType: sourcePort.type },
             markerEnd: ATOM_EDGE_MARKERS,
           },
-          eds,
-        ),
-      )
+          filtered,
+        )
+      })
     },
     [nodes, setEdges],
   )
