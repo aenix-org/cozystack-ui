@@ -7,6 +7,7 @@ import type { UserInputField } from "../../lib/builder/dynamic-fields.ts"
 import { FormField, inputClass } from "../FormField.tsx"
 import { Toggle } from "../Toggle.tsx"
 import { FieldsEditor } from "./FieldsEditor.tsx"
+import { ConstantEditor } from "./ConstantEditor.tsx"
 
 interface AtomInspectorProps {
   nodeId: string
@@ -123,6 +124,15 @@ export function AtomInspector({
           </section>
         )}
 
+        {atom.hasConstantValue && (
+          <section>
+            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              Constant value
+            </h3>
+            <ConstantEditor data={data} onChange={onChange} />
+          </section>
+        )}
+
         {atom.params.length > 0 ? (
           <div className="space-y-3">
             {atom.params.map((param) => {
@@ -181,7 +191,7 @@ export function AtomInspector({
               )
             })}
           </div>
-        ) : (
+        ) : atom.hasDynamicFields || atom.hasConstantValue ? null : (
           <p className="text-xs italic text-slate-400">This atom has no parameters.</p>
         )}
 

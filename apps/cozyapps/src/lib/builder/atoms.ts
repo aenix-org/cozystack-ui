@@ -49,6 +49,8 @@ export interface AtomDef {
    * (currently only the User Input atom). Outputs come from node.data.fields.
    */
   hasDynamicFields?: boolean
+  /** Surface a Constant-style inspector (single typed value). */
+  hasConstantValue?: boolean
 }
 
 import type { AtomNodeData } from "./types.ts"
@@ -79,22 +81,8 @@ export const ATOMS: AtomDef[] = [
     accentFg: "text-slate-700",
     inputs: [],
     outputs: [],
-    params: [
-      {
-        key: "valueType",
-        label: "Type",
-        type: "enum",
-        options: ["string", "number", "boolean", "image", "host"],
-        defaultValue: "string",
-      },
-      {
-        key: "value",
-        label: "Value",
-        type: "string",
-        placeholder: "wordpress:6.4",
-        hint: "Boolean values: type 'true' or 'false'",
-      },
-    ],
+    params: [],
+    hasConstantValue: true,
   },
 
   // ─── K8s Primitives ───────────────────────────────────────────────────
