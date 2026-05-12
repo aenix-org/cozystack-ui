@@ -167,6 +167,72 @@ They do not interfere with reconcile.
 
 ---
 
+## 4a. Status Workflow — Separate Concern
+
+Each atom carries **two** workflow templates, not one:
+
+- **`reconcile`** — drives the cluster towards desired state, writes
+  outputs. Cron + event-triggered. Has side effects.
+- **`status`** — read-only probe that reports observed health and
+  human-readable conditions. Cron-only, runs more often than
+  reconcile (e.g. every 30–60 s). Idempotent by construction.
+
+```yaml
+spec:
+  outputs:
+    credentials: { type: secret-ref }
+    service:     { type: service-ref }
+  reconcile:
+    steps: [...]              # apply desired
+  status:
+    steps:
+      - check-cluster-phase
+      - check-replicas-ready
+      - check-service-endpoints
+      - aggregate              # → Application.status.atoms[atom]
+```
+
+The status workflow publishes to `Application.status.atoms[<atomName>]`:
+
+```yaml
+status:
+  atoms:
+    postgres:
+      status: healthy
+      messages: []
+      lastChecked: 2024-01-15T10:30:00Z
+    container:
+      status: drift
+      messages:
+        - "One pod runs an older image digest"
+        - "ReplicaSet has 2 revisions, expected 1"
+      lastChecked: 2024-01-15T10:30:05Z
+```
+
+**Why this matters:**
+
+- **Decoupling**: status keeps reporting even when reconcile is idle —
+  drift detected by status triggers a reconcile.
+- **Visibility**: UI shows live atom status without waiting for the
+  next reconcile cycle.
+- **Composability**: a downstream atom's status workflow can read the
+  upstream atom's status to make smart decisions
+  (`if postgres.status != healthy then mark self as 'waiting upstream'`).
+- **Cost**: status is short and read-only, cheap to run frequently.
+
+**Aggregate Application sync state** is computed from per-atom
+statuses by the controller (worst wins): all healthy → `In sync`, any
+drift → `Drift detected`, any reconciling → `Reconciling`, any failed
+→ `Reconcile failed`. This is what the SyncStateBadge in the UI
+reflects.
+
+**Messages contract:** short, present tense, actionable when possible
+("Image pull failed: manifest unknown for wordpress:6.4.99" rather
+than "There was an error"). Authored by the atom maintainer in
+status DAG steps. UI renders them inline on the topology view.
+
+---
+
 ## 5. Side Effects in a Declarative World
 
 Declarative state alone can't express:

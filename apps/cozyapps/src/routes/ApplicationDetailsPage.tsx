@@ -16,6 +16,8 @@ import { MetricStatCard } from "../components/MetricStatCard.tsx"
 import { UsageBar } from "../components/UsageBar.tsx"
 import { LogsViewer } from "../components/LogsViewer.tsx"
 import { ChangesTimeline, SyncStateBadge } from "../components/ChangesTimeline.tsx"
+import { TopologySection } from "../components/TopologySection.tsx"
+import { generateTopology } from "../lib/topology.ts"
 
 export function ApplicationDetailsPage() {
   // Subscribe to the store so mutations (status changes, new actions) re-render.
@@ -28,6 +30,7 @@ export function ApplicationDetailsPage() {
   const actionIdBase = useId()
   const actionCounter = useRef(0)
   const metrics = useMemo(() => (app ? generateMetrics(app) : null), [app])
+  const topology = useMemo(() => (app ? generateTopology(app) : []), [app])
 
   if (!app || !metrics) {
     return (
@@ -157,6 +160,19 @@ export function ApplicationDetailsPage() {
               digits={1}
             />
           </div>
+        </Section>
+
+        <Section
+          title="Topology"
+          description="What actually runs in the cluster — atoms and the k8s objects they own"
+          actions={
+            <span className="text-xs text-slate-500">
+              {topology.length} atoms ·{" "}
+              {topology.reduce((sum, a) => sum + a.resources.length, 0)} objects
+            </span>
+          }
+        >
+          <TopologySection topology={topology} />
         </Section>
 
         <Section
