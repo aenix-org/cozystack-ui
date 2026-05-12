@@ -1,19 +1,22 @@
 import { useSyncExternalStore } from "react"
-import type { Action, Application, Environment } from "./types.ts"
+import type { Action, Application, ApplicationTemplate, Environment } from "./types.ts"
 import { INITIAL_APPLICATIONS } from "./mocks/applications.ts"
 import { INITIAL_ENVIRONMENTS } from "./mocks/environments.ts"
 import { INITIAL_ACTIONS } from "./mocks/actions.ts"
+import { TEMPLATES } from "./mocks/templates.ts"
 
 interface State {
   applications: Application[]
   environments: Environment[]
   actions: Action[]
+  templates: ApplicationTemplate[]
 }
 
 const state: State = {
   applications: [...INITIAL_APPLICATIONS],
   environments: [...INITIAL_ENVIRONMENTS],
   actions: [...INITIAL_ACTIONS],
+  templates: [...TEMPLATES],
 }
 
 const listeners = new Set<() => void>()
@@ -31,6 +34,7 @@ const snapshots = {
   applications: state.applications,
   environments: state.environments,
   actions: state.actions,
+  templates: state.templates,
 }
 
 function getApplications() {
@@ -45,6 +49,10 @@ function getActions() {
   return snapshots.actions
 }
 
+function getTemplates() {
+  return snapshots.templates
+}
+
 export function useApplications(): Application[] {
   return useSyncExternalStore(subscribe, getApplications)
 }
@@ -55,6 +63,10 @@ export function useEnvironments(): Environment[] {
 
 export function useActions(): Action[] {
   return useSyncExternalStore(subscribe, getActions)
+}
+
+export function useTemplates(): ApplicationTemplate[] {
+  return useSyncExternalStore(subscribe, getTemplates)
 }
 
 export function addApplication(app: Application) {
@@ -72,6 +84,12 @@ export function addEnvironment(env: Environment) {
 export function addAction(action: Action) {
   state.actions = [...state.actions, action]
   snapshots.actions = state.actions
+  emit()
+}
+
+export function addTemplate(template: ApplicationTemplate) {
+  state.templates = [template, ...state.templates]
+  snapshots.templates = state.templates
   emit()
 }
 

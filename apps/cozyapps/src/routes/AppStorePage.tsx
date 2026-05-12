@@ -2,7 +2,7 @@ import { useMemo, useState } from "react"
 import { Link } from "react-router"
 import { Search, Sparkles } from "lucide-react"
 import { Button, cn } from "@cozystack/ui"
-import { TEMPLATES } from "../lib/mocks/templates.ts"
+import { useTemplates } from "../lib/mock-store.ts"
 import type { TemplateCategory } from "../lib/types.ts"
 import { TemplateCard } from "../components/TemplateCard.tsx"
 import { Breadcrumb } from "../components/Breadcrumb.tsx"
@@ -20,12 +20,13 @@ const FILTERS: { id: Filter; label: string }[] = [
 ]
 
 export function AppStorePage() {
+  const templates = useTemplates()
   const [filter, setFilter] = useState<Filter>("all")
   const [search, setSearch] = useState("")
 
   const filtered = useMemo(() => {
     const lower = search.toLowerCase().trim()
-    return TEMPLATES.filter((t) => {
+    return templates.filter((t) => {
       if (filter !== "all" && !t.categories.includes(filter)) return false
       if (!lower) return true
       return (
@@ -33,7 +34,7 @@ export function AppStorePage() {
         t.subtitle.toLowerCase().includes(lower)
       )
     })
-  }, [filter, search])
+  }, [filter, search, templates])
 
   return (
     <div className="p-6">

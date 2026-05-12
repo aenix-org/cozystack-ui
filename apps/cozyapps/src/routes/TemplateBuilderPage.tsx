@@ -1,23 +1,316 @@
+import { useCallback, useMemo, useRef, useState } from "react"
+import { useNavigate } from "react-router"
+import {
+  Background,
+  BackgroundVariant,
+  Controls,
+  MiniMap,
+  ReactFlow,
+  ReactFlowProvider,
+  addEdge,
+  useEdgesState,
+  useNodesState,
+  type Connection,
+  type Edge,
+  type EdgeTypes,
+  type Node,
+  type NodeTypes,
+  type OnConnect,
+  type ReactFlowInstance,
+} from "@xyflow/react"
+import "@xyflow/react/dist/style.css"
+import { Sparkles, Trash2, Upload } from "lucide-react"
+import { Button } from "@cozystack/ui"
 import { Breadcrumb } from "../components/Breadcrumb.tsx"
-import { PageHeader } from "../components/PageHeader.tsx"
+import { AtomNode } from "../components/builder/AtomNode.tsx"
+import { AtomEdge } from "../components/builder/AtomEdge.tsx"
+import { AtomPalette } from "../components/builder/AtomPalette.tsx"
+import { AtomInspector } from "../components/builder/AtomInspector.tsx"
+import {
+  PublishDialog,
+  type PublishedTemplateDraft,
+} from "../components/builder/PublishDialog.tsx"
+import { addTemplate } from "../lib/mock-store.ts"
+import {
+  ATOMS,
+  findAtom,
+  type AtomDef,
+} from "../lib/builder/atoms.ts"
+import { isCompatible } from "../lib/builder/port-types.ts"
+import type { AtomNodeData } from "../lib/builder/types.ts"
+import { presetWordpress } from "../lib/builder/preset.ts"
+import type { ApplicationTemplate } from "../lib/types.ts"
+
+const nodeTypes: NodeTypes = { atom: AtomNode }
+const edgeTypes: EdgeTypes = { atom: AtomEdge }
+
+const DRAG_MIME = "application/x-cozyapps-atom"
+
+type BuilderNode = Node<AtomNodeData>
+
+function makeNodeId(atomType: string, existing: BuilderNode[]): string {
+  let counter = 1
+  let candidate = `${atomType}-${counter}`
+  while (existing.some((n) => n.id === candidate)) {
+    counter += 1
+    candidate = `${atomType}-${counter}`
+  }
+  return candidate
+}
+
+function defaultParams(atom: AtomDef): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const p of atom.params) {
+    if (p.defaultValue !== undefined) out[p.key] = p.defaultValue
+  }
+  return out
+}
 
 export function TemplateBuilderPage() {
   return (
-    <div className="flex h-full flex-col p-6">
-      <Breadcrumb
-        items={[
-          { label: "Applications", to: "/apps" },
-          { label: "App Store", to: "/store" },
-          { label: "Create Template" },
-        ]}
-      />
-      <PageHeader
-        title="Template Builder"
-        description="Compose your application as a graph of typed building blocks"
-      />
-      <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white text-sm text-slate-400">
-        Canvas placeholder
+    <ReactFlowProvider>
+      <BuilderInner />
+    </ReactFlowProvider>
+  )
+}
+
+function BuilderInner() {
+  const preset = useMemo(() => presetWordpress(), [])
+  const [nodes, setNodes, onNodesChange] = useNodesState<BuilderNode>(
+    preset.nodes as BuilderNode[],
+  )
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(preset.edges)
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [publishOpen, setPublishOpen] = useState(false)
+  const reactFlowWrapper = useRef<HTMLDivElement | null>(null)
+  const rfInstance = useRef<ReactFlowInstance<BuilderNode, Edge> | null>(null)
+  const navigate = useNavigate()
+
+  const selectedNode = useMemo(
+    () => (selectedNodeId ? nodes.find((n) => n.id === selectedNodeId) ?? null : null),
+    [nodes, selectedNodeId],
+  )
+
+  const onConnect: OnConnect = useCallback(
+    (connection: Connection) => {
+      if (!connection.source || !connection.target) return
+      const sourceNode = nodes.find((n) => n.id === connection.source)
+      const targetNode = nodes.find((n) => n.id === connection.target)
+      if (!sourceNode || !targetNode) return
+      const sourceAtom = findAtom(sourceNode.data.atomType)
+      const targetAtom = findAtom(targetNode.data.atomType)
+      if (!sourceAtom || !targetAtom) return
+      const sourcePort = sourceAtom.outputs.find((p) => p.key === connection.sourceHandle)
+      const targetPort = targetAtom.inputs.find((p) => p.key === connection.targetHandle)
+      if (!sourcePort || !targetPort) return
+      if (!isCompatible(sourcePort.type, targetPort.type)) return
+      setEdges((eds) =>
+        addEdge(
+          {
+            ...connection,
+            type: "atom",
+            data: { portType: sourcePort.type },
+          },
+          eds,
+        ),
+      )
+    },
+    [nodes, setEdges],
+  )
+
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault()
+    event.dataTransfer.dropEffect = "move"
+  }, [])
+
+  const onDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault()
+      const atomType = event.dataTransfer.getData(DRAG_MIME)
+      if (!atomType) return
+      const atom = ATOMS.find((a) => a.type === atomType)
+      if (!atom || !rfInstance.current) return
+      const position = rfInstance.current.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      })
+      setNodes((current) => {
+        const id = makeNodeId(atomType, current)
+        const newNode: BuilderNode = {
+          id,
+          type: "atom",
+          position,
+          data: {
+            atomType,
+            params: defaultParams(atom),
+            status: "idle",
+          },
+        }
+        return [...current, newNode]
+      })
+    },
+    [setNodes],
+  )
+
+  const handlePaletteDragStart = useCallback(
+    (event: React.DragEvent<HTMLDivElement>, atom: AtomDef) => {
+      event.dataTransfer.setData(DRAG_MIME, atom.type)
+      event.dataTransfer.effectAllowed = "move"
+    },
+    [],
+  )
+
+  const updateSelectedNode = useCallback(
+    (next: AtomNodeData) => {
+      if (!selectedNodeId) return
+      setNodes((current) =>
+        current.map((n) => (n.id === selectedNodeId ? { ...n, data: next } : n)),
+      )
+    },
+    [selectedNodeId, setNodes],
+  )
+
+  const deleteSelectedNode = useCallback(() => {
+    if (!selectedNodeId) return
+    setNodes((current) => current.filter((n) => n.id !== selectedNodeId))
+    setEdges((current) =>
+      current.filter((e) => e.source !== selectedNodeId && e.target !== selectedNodeId),
+    )
+    setSelectedNodeId(null)
+  }, [selectedNodeId, setNodes, setEdges])
+
+  const resetGraph = useCallback(() => {
+    setNodes([])
+    setEdges([])
+    setSelectedNodeId(null)
+  }, [setNodes, setEdges])
+
+  const handlePublish = useCallback(
+    (draft: PublishedTemplateDraft) => {
+      const template: ApplicationTemplate = {
+        slug: draft.slug,
+        displayName: draft.displayName,
+        version: "0.1.0",
+        subtitle: draft.subtitle,
+        description: `Custom template assembled with ${nodes.length} atoms and ${edges.length} connections.`,
+        categories: [draft.category],
+        icon: draft.icon,
+        iconBg: "rgba(59,130,246,0.10)",
+        maintainer: "You",
+        lastUpdated: "just now",
+        resources: { cpu: 1, ramGb: 1, storageGb: 5 },
+        includedFeatures: nodes
+          .map((n) => findAtom(n.data.atomType)?.displayName)
+          .filter((x): x is string => Boolean(x)),
+        actions: [{ name: "Restart", description: "Restart the application" }],
+        parameters: [
+          {
+            key: "name",
+            label: "Name",
+            type: "string",
+            placeholder: draft.slug,
+            required: true,
+          },
+        ],
+      }
+      addTemplate(template)
+      setPublishOpen(false)
+      navigate(`/store/${draft.slug}`)
+    },
+    [edges.length, navigate, nodes],
+  )
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="border-b border-slate-200 bg-white px-6 py-3">
+        <Breadcrumb
+          items={[
+            { label: "Applications", to: "/apps" },
+            { label: "App Store", to: "/store" },
+            { label: "Create Template" },
+          ]}
+        />
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <h1 className="flex items-center gap-2 text-xl font-semibold text-slate-900">
+              <Sparkles className="size-5 text-blue-500" />
+              Template Builder
+            </h1>
+            <p className="mt-0.5 text-sm text-slate-500">
+              Drag atoms from the palette, wire their ports, and publish.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={resetGraph}>
+              <Trash2 className="size-3.5" />
+              Clear
+            </Button>
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={() => setPublishOpen(true)}
+              disabled={nodes.length === 0}
+            >
+              <Upload className="size-4" />
+              Publish to Store
+            </Button>
+          </div>
+        </div>
       </div>
+
+      <div className="flex flex-1 overflow-hidden">
+        <AtomPalette onDragStart={handlePaletteDragStart} />
+        <div ref={reactFlowWrapper} className="relative flex-1 bg-slate-50">
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onDrop={onDrop}
+            onDragOver={onDragOver}
+            onInit={(instance) => {
+              rfInstance.current = instance as ReactFlowInstance<BuilderNode, Edge>
+            }}
+            onNodeClick={(_, node) => setSelectedNodeId(node.id)}
+            onPaneClick={() => setSelectedNodeId(null)}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            defaultEdgeOptions={{ type: "atom" }}
+            fitView
+            fitViewOptions={{ padding: 0.2 }}
+            proOptions={{ hideAttribution: true }}
+            minZoom={0.3}
+            maxZoom={1.5}
+          >
+            <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} color="#cbd5e1" />
+            <Controls position="bottom-left" showInteractive={false} />
+            <MiniMap
+              position="bottom-right"
+              maskColor="rgba(241,245,249,0.7)"
+              nodeColor="#cbd5e1"
+              nodeStrokeWidth={3}
+              pannable
+              zoomable
+            />
+          </ReactFlow>
+        </div>
+        {selectedNode && (
+          <AtomInspector
+            nodeId={selectedNode.id}
+            data={selectedNode.data}
+            onChange={updateSelectedNode}
+            onDelete={deleteSelectedNode}
+            onClose={() => setSelectedNodeId(null)}
+          />
+        )}
+      </div>
+
+      <PublishDialog
+        open={publishOpen}
+        onOpenChange={setPublishOpen}
+        onPublish={handlePublish}
+      />
     </div>
   )
 }
