@@ -13,6 +13,7 @@ import { Breadcrumb } from "../components/Breadcrumb.tsx"
 import { PageHeader } from "../components/PageHeader.tsx"
 import { DynamicForm } from "../components/DynamicForm.tsx"
 import { FormField, inputClass } from "../components/FormField.tsx"
+import { Select } from "../components/Select.tsx"
 
 const NAME_RE = /^[a-z]([-a-z0-9]*[a-z0-9])?$/
 
@@ -102,17 +103,11 @@ export function LaunchFormPage() {
             />
           </FormField>
           <FormField label="Environment" required hint="Where your application will run">
-            <select
-              className={inputClass}
+            <Select
               value={environment}
-              onChange={(e) => setEnvironment(e.target.value)}
-            >
-              {environments.map((env) => (
-                <option key={env.name} value={env.name}>
-                  {env.name}
-                </option>
-              ))}
-            </select>
+              onChange={setEnvironment}
+              options={environments.map((env) => ({ value: env.name, label: env.name }))}
+            />
           </FormField>
         </div>
 

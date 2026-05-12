@@ -3,6 +3,7 @@ import type { AtomNodeData } from "../../lib/builder/types.ts"
 import { PORT_TYPE, type PortType } from "../../lib/builder/port-types.ts"
 import { inputClass } from "../FormField.tsx"
 import { Toggle } from "../Toggle.tsx"
+import { Select } from "../Select.tsx"
 
 type ConstantType = "string" | "number" | "boolean" | "image" | "host"
 
@@ -90,18 +91,14 @@ export function ConstantEditor({ data, onChange }: ConstantEditorProps) {
         >
           Type
         </label>
-        <select
-          id={typeId}
-          className={`${inputClass} mt-0.5`}
-          value={valueType}
-          onChange={(e) => setType(e.target.value as ConstantType)}
-        >
-          {TYPE_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+        <div className="mt-0.5">
+          <Select
+            id={typeId}
+            value={valueType}
+            onChange={(v) => setType(v as ConstantType)}
+            options={TYPE_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+          />
+        </div>
       </div>
 
       <div>

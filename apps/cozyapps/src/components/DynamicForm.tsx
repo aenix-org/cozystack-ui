@@ -2,6 +2,7 @@ import { Fragment, useMemo } from "react"
 import type { ParamDef } from "../lib/types.ts"
 import { FormField, inputClass } from "./FormField.tsx"
 import { Toggle } from "./Toggle.tsx"
+import { Select } from "./Select.tsx"
 
 interface DynamicFormProps {
   params: ParamDef[]
@@ -52,17 +53,14 @@ export function DynamicForm({ params, values, onChange }: DynamicFormProps) {
                     required={param.required}
                     hint={param.hint}
                   >
-                    <select
-                      className={inputClass}
+                    <Select
                       value={String(value ?? "")}
-                      onChange={(e) => setValue(param.key, e.target.value)}
-                    >
-                      {param.options?.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(v) => setValue(param.key, v)}
+                      options={(param.options ?? []).map((opt) => ({
+                        value: opt,
+                        label: opt,
+                      }))}
+                    />
                   </FormField>
                 )
               }

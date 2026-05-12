@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Button } from "@cozystack/ui"
 import { Modal } from "../Modal.tsx"
 import { FormField, inputClass } from "../FormField.tsx"
+import { Select } from "../Select.tsx"
 import type { TemplateCategory } from "../../lib/types.ts"
 
 const SLUG_RE = /^[a-z]([-a-z0-9]*[a-z0-9])?$/
@@ -106,17 +107,11 @@ export function PublishDialog({ open, onOpenChange, onPublish }: PublishDialogPr
           />
         </FormField>
         <FormField label="Category">
-          <select
-            className={inputClass}
+          <Select
             value={category}
-            onChange={(e) => setCategory(e.target.value as TemplateCategory)}
-          >
-            {CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setCategory(v as TemplateCategory)}
+            options={CATEGORIES.map((c) => ({ value: c.value, label: c.label }))}
+          />
         </FormField>
         <FormField label="Icon">
           <div className="flex flex-wrap gap-1.5">

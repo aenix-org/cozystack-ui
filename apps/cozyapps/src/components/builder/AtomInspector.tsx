@@ -6,6 +6,7 @@ import type { AtomNodeData } from "../../lib/builder/types.ts"
 import type { UserInputField } from "../../lib/builder/dynamic-fields.ts"
 import { FormField, inputClass } from "../FormField.tsx"
 import { Toggle } from "../Toggle.tsx"
+import { Select } from "../Select.tsx"
 import { FieldsEditor } from "./FieldsEditor.tsx"
 import { ConstantEditor } from "./ConstantEditor.tsx"
 
@@ -47,17 +48,11 @@ export function AtomInspector({
     }
     if (param.type === "enum") {
       return (
-        <select
-          className={inputClass}
+        <Select
           value={String(value ?? "")}
-          onChange={(e) => setParam(param.key, e.target.value)}
-        >
-          {param.options?.map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
-            </option>
-          ))}
-        </select>
+          onChange={(v) => setParam(param.key, v)}
+          options={(param.options ?? []).map((opt) => ({ value: opt, label: opt }))}
+        />
       )
     }
     if (param.type === "number") {

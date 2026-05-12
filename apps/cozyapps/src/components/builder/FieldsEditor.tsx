@@ -11,6 +11,7 @@ import {
 import { PORT_TYPE } from "../../lib/builder/port-types.ts"
 import { inputClass } from "../FormField.tsx"
 import { Toggle } from "../Toggle.tsx"
+import { Select } from "../Select.tsx"
 
 interface FieldsEditorProps {
   fields: UserInputField[]
@@ -105,17 +106,14 @@ function FieldCard({ field, onPatch, onRemove }: FieldCardProps) {
           />
         </LabeledInput>
         <LabeledInput label="Type">
-          <select
-            className={inputClass}
+          <Select
             value={field.type}
-            onChange={(e) => onPatch({ type: e.target.value as UserInputFieldType })}
-          >
-            {FIELD_TYPE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => onPatch({ type: v as UserInputFieldType })}
+            options={FIELD_TYPE_OPTIONS.map((opt) => ({
+              value: opt.value,
+              label: opt.label,
+            }))}
+          />
         </LabeledInput>
         <LabeledInput label="Required" inline>
           <Toggle
@@ -226,12 +224,15 @@ function renderPreviewControl(field: UserInputField) {
   }
   if (field.type === "enum") {
     return (
-      <select className={`${inputClass} mt-1`} disabled>
-        {(field.options ?? []).map((opt) => (
-          <option key={opt}>{opt}</option>
-        ))}
-        {(field.options?.length ?? 0) === 0 && <option>(no options)</option>}
-      </select>
+      <div className="mt-1">
+        <Select
+          value=""
+          onChange={() => {}}
+          disabled
+          placeholder={field.options?.[0] ?? "(no options)"}
+          options={(field.options ?? []).map((opt) => ({ value: opt, label: opt }))}
+        />
+      </div>
     )
   }
   return (
