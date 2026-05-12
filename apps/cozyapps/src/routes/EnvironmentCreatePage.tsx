@@ -7,20 +7,68 @@ import type { EnvironmentStatus } from "../lib/types.ts"
 import { Breadcrumb } from "../components/Breadcrumb.tsx"
 import { PageHeader } from "../components/PageHeader.tsx"
 import { FormField, inputClass } from "../components/FormField.tsx"
+import { CardRadioGroup, type CardOption } from "../components/CardRadioGroup.tsx"
+import { ResourcePill } from "../components/ResourcePill.tsx"
 
 const NAME_RE = /^[a-z]([-a-z0-9]*[a-z0-9])?$/
 
-const SIZE_OPTIONS: { value: string; label: string; cpuPerNode: number; ramPerNode: number }[] = [
-  { value: "auto", label: "Auto", cpuPerNode: 4, ramPerNode: 8 },
-  { value: "small", label: "Small (2 CPU, 4 GB)", cpuPerNode: 2, ramPerNode: 4 },
-  { value: "medium", label: "Medium (4 CPU, 8 GB)", cpuPerNode: 4, ramPerNode: 8 },
-  { value: "large", label: "Large (8 CPU, 16 GB)", cpuPerNode: 8, ramPerNode: 16 },
+type SizeValue = "auto" | "small" | "medium" | "large"
+
+interface SizeDef {
+  value: SizeValue
+  title: string
+  description: string
+  cpuPerNode: number
+  ramPerNode: number
+}
+
+const SIZE_OPTIONS: SizeDef[] = [
+  {
+    value: "auto",
+    title: "Auto",
+    description: "Recommended for typical workloads",
+    cpuPerNode: 4,
+    ramPerNode: 8,
+  },
+  {
+    value: "small",
+    title: "Small",
+    description: "Light workloads and previews",
+    cpuPerNode: 2,
+    ramPerNode: 4,
+  },
+  {
+    value: "medium",
+    title: "Medium",
+    description: "Production-grade single-tenant apps",
+    cpuPerNode: 4,
+    ramPerNode: 8,
+  },
+  {
+    value: "large",
+    title: "Large",
+    description: "Heavier workloads and multiple apps",
+    cpuPerNode: 8,
+    ramPerNode: 16,
+  },
 ]
+
+const SIZE_CARDS: CardOption<SizeValue>[] = SIZE_OPTIONS.map((opt) => ({
+  value: opt.value,
+  title: opt.title,
+  description: opt.description,
+  badges: (
+    <>
+      <ResourcePill icon="cpu">{opt.cpuPerNode} CPU</ResourcePill>
+      <ResourcePill icon="ram">{opt.ramPerNode} GB</ResourcePill>
+    </>
+  ),
+}))
 
 export function EnvironmentCreatePage() {
   const [name, setName] = useState("")
   const [maxNodes, setMaxNodes] = useState("")
-  const [nodeSize, setNodeSize] = useState("auto")
+  const [nodeSize, setNodeSize] = useState<SizeValue>("auto")
   const [nameError, setNameError] = useState<string | undefined>(undefined)
   const navigate = useNavigate()
 
@@ -92,17 +140,7 @@ export function EnvironmentCreatePage() {
           />
         </FormField>
         <FormField label="Node size">
-          <select
-            className={inputClass}
-            value={nodeSize}
-            onChange={(e) => setNodeSize(e.target.value)}
-          >
-            {SIZE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          <CardRadioGroup value={nodeSize} onChange={setNodeSize} options={SIZE_CARDS} />
         </FormField>
 
         <div className="flex items-center gap-3 border-t border-slate-200 pt-5">
