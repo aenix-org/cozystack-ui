@@ -1,17 +1,21 @@
 import { MoreHorizontal } from "lucide-react"
-import { Button, StatusBadge } from "@cozystack/ui"
-import type { Environment } from "../lib/types.ts"
+import { Button, StatusBadge, cn } from "@cozystack/ui"
+import type { Application, Environment } from "../lib/types.ts"
 import { environmentStatusTone } from "../lib/status.ts"
 import { timeAgo } from "../lib/humanize.ts"
+import { tierBarClass } from "../lib/app-presentation.ts"
 import { ResourcePill } from "./ResourcePill.tsx"
+import { EnvironmentAppMiniCard } from "./EnvironmentAppMiniCard.tsx"
 
 interface EnvironmentCardProps {
   env: Environment
+  apps: Application[]
 }
 
-export function EnvironmentCard({ env }: EnvironmentCardProps) {
+export function EnvironmentCard({ env, apps }: EnvironmentCardProps) {
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4">
+    <div className="relative flex flex-col gap-3 overflow-hidden rounded-lg border border-slate-200 bg-white p-4 pl-5">
+      <span className={cn("absolute left-0 top-0 h-full w-1", tierBarClass(env.name))} />
       <div className="flex items-center gap-2">
         <span className="flex-1 font-mono text-sm font-medium text-slate-900">{env.name}</span>
         <StatusBadge tone={environmentStatusTone(env.status)}>{env.status}</StatusBadge>
@@ -21,6 +25,24 @@ export function EnvironmentCard({ env }: EnvironmentCardProps) {
         <ResourcePill icon="cpu">{env.cpu} CPU</ResourcePill>
         <ResourcePill icon="ram">{env.ramGb} GB RAM</ResourcePill>
       </div>
+
+      <div>
+        <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+          Applications ({apps.length})
+        </div>
+        {apps.length === 0 ? (
+          <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-400">
+            No applications deployed
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+            {apps.map((app) => (
+              <EnvironmentAppMiniCard key={app.name} app={app} />
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
         <span className="flex-1 text-xs text-slate-400">Created {timeAgo(env.createdAt)}</span>
         <Button size="sm" variant="outline">

@@ -4,6 +4,7 @@ import { Button, StatusBadge } from "@cozystack/ui"
 import type { Application } from "../lib/types.ts"
 import { applicationStatusTone } from "../lib/status.ts"
 import { timeAgo } from "../lib/humanize.ts"
+import { iconBg, iconFor } from "../lib/app-presentation.ts"
 import { AppIcon } from "./AppIcon.tsx"
 import { EnvironmentPill } from "./EnvironmentPill.tsx"
 
@@ -66,41 +67,3 @@ export function ApplicationCard({ app }: ApplicationCardProps) {
   )
 }
 
-function iconFor(slug: string): string {
-  switch (slug) {
-    case "wordpress":
-      return "🌐"
-    case "minecraft":
-      return "🎮"
-    case "cs2":
-      return "🎯"
-    case "static":
-      return "📄"
-    case "nodejs":
-    case "nextjs":
-      return "🟢"
-    case "drupal":
-      return "🟣"
-    case "ghost":
-      return "👻"
-    default:
-      return "📦"
-  }
-}
-
-function iconBg(slug: string): string {
-  switch (slug) {
-    case "wordpress":
-      return "rgb(241 245 249)"
-    case "minecraft":
-    case "cs2":
-      return "rgba(248,113,113,0.10)"
-    case "nodejs":
-    case "nextjs":
-      return "rgba(62,207,142,0.10)"
-    case "drupal":
-      return "rgba(144,97,249,0.10)"
-    default:
-      return "rgb(241 245 249)"
-  }
-}

@@ -1,14 +1,21 @@
 import { Link } from "react-router"
 import { Plus } from "lucide-react"
 import { Button } from "@cozystack/ui"
-import { useEnvironments } from "../lib/mock-store.ts"
+import { useApplications, useEnvironments } from "../lib/mock-store.ts"
 import { EnvironmentCard } from "../components/EnvironmentCard.tsx"
 import { Breadcrumb } from "../components/Breadcrumb.tsx"
 import { PageHeader } from "../components/PageHeader.tsx"
 
 export function EnvironmentsPage() {
   const envs = useEnvironments()
+  const apps = useApplications()
   const readyCount = envs.filter((e) => e.status === "Ready").length
+  const appsByEnv = new Map<string, typeof apps>()
+  for (const app of apps) {
+    const bucket = appsByEnv.get(app.environment) ?? []
+    bucket.push(app)
+    appsByEnv.set(app.environment, bucket)
+  }
 
   return (
     <div className="p-6">
@@ -32,7 +39,7 @@ export function EnvironmentsPage() {
         <>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {envs.map((env) => (
-              <EnvironmentCard key={env.name} env={env} />
+              <EnvironmentCard key={env.name} env={env} apps={appsByEnv.get(env.name) ?? []} />
             ))}
           </div>
           <p className="mt-4 text-xs text-slate-400">
