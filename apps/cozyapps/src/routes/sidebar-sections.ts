@@ -1,4 +1,4 @@
-import { LayoutGrid, Store, Server, HardDrive, Archive, Settings } from "lucide-react"
+import { LayoutGrid, Store, Server, Settings } from "lucide-react"
 import type { SidebarSection } from "@cozystack/ui"
 
 export const SIDEBAR_SECTIONS: SidebarSection[] = [
@@ -11,11 +11,7 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
   },
   {
     title: "Infrastructure",
-    items: [
-      { label: "Environments", to: "/environments", icon: Server },
-      { label: "Resources", to: "/resources", icon: HardDrive },
-      { label: "Backups", to: "/backups", icon: Archive },
-    ],
+    items: [{ label: "Environments", to: "/environments", icon: Server }],
   },
   {
     title: "Account",
