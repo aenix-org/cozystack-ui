@@ -10,8 +10,9 @@ const HEADER_H = 36
 const PORT_ROW_H = 24
 const PORTS_PAD = 8
 
-function portTop(index: number): number {
-  return HEADER_H + PORTS_PAD + index * PORT_ROW_H + PORT_ROW_H / 2
+/** Y of the row top inside the (relative) body div — header sits above. */
+function rowTop(index: number): number {
+  return PORTS_PAD + index * PORT_ROW_H
 }
 
 function handleStyle(type: keyof typeof PORT_TYPE, top: number): React.CSSProperties {
@@ -90,48 +91,48 @@ function AtomNodeContent({ atom, status, selected }: AtomNodeContentProps) {
         </span>
       </header>
       <div className="relative" style={{ minHeight: minBodyHeight }}>
-        {atom.inputs.map((port, idx) => {
-          const top = portTop(idx)
-          return (
-            <div
-              key={`in-${port.key}`}
-              className="flex items-center text-xs text-slate-600"
-              style={{ position: "absolute", left: 0, right: 0, top: top - PORT_ROW_H / 2, height: PORT_ROW_H }}
-            >
-              <Handle
-                type="target"
-                position={Position.Left}
-                id={port.key}
-                style={handleStyle(port.type, PORT_ROW_H / 2)}
-              />
-              <span className="ml-3 truncate">{port.label}</span>
-              <span className="ml-auto mr-3 font-mono text-[10px] uppercase tracking-wide text-slate-300">
-                {PORT_TYPE[port.type].label}
-              </span>
-            </div>
-          )
-        })}
-        {atom.outputs.map((port, idx) => {
-          const top = portTop(inputCount + idx)
-          return (
-            <div
-              key={`out-${port.key}`}
-              className="flex items-center text-xs text-slate-600"
-              style={{ position: "absolute", left: 0, right: 0, top: top - PORT_ROW_H / 2, height: PORT_ROW_H }}
-            >
-              <span className="ml-3 font-mono text-[10px] uppercase tracking-wide text-slate-300">
-                {PORT_TYPE[port.type].label}
-              </span>
-              <span className="ml-auto mr-3 truncate text-right">{port.label}</span>
-              <Handle
-                type="source"
-                position={Position.Right}
-                id={port.key}
-                style={handleStyle(port.type, PORT_ROW_H / 2)}
-              />
-            </div>
-          )
-        })}
+        {atom.inputs.map((port, idx) => (
+          <div
+            key={`in-${port.key}`}
+            className="flex items-center text-xs text-slate-600"
+            style={{ position: "absolute", left: 0, right: 0, top: rowTop(idx), height: PORT_ROW_H }}
+          >
+            <Handle
+              type="target"
+              position={Position.Left}
+              id={port.key}
+              style={handleStyle(port.type, PORT_ROW_H / 2)}
+            />
+            <span className="ml-3 truncate">{port.label}</span>
+            <span className="ml-auto mr-3 font-mono text-[10px] uppercase tracking-wide text-slate-300">
+              {PORT_TYPE[port.type].label}
+            </span>
+          </div>
+        ))}
+        {atom.outputs.map((port, idx) => (
+          <div
+            key={`out-${port.key}`}
+            className="flex items-center text-xs text-slate-600"
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              top: rowTop(inputCount + idx),
+              height: PORT_ROW_H,
+            }}
+          >
+            <span className="ml-3 font-mono text-[10px] uppercase tracking-wide text-slate-300">
+              {PORT_TYPE[port.type].label}
+            </span>
+            <span className="ml-auto mr-3 truncate text-right">{port.label}</span>
+            <Handle
+              type="source"
+              position={Position.Right}
+              id={port.key}
+              style={handleStyle(port.type, PORT_ROW_H / 2)}
+            />
+          </div>
+        ))}
       </div>
     </div>
   )
