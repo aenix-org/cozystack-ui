@@ -5,6 +5,7 @@ import { MyApplicationsPage } from "./routes/MyApplicationsPage.tsx"
 import { ApplicationDetailsPage } from "./routes/ApplicationDetailsPage.tsx"
 import { AppStorePage } from "./routes/AppStorePage.tsx"
 import { TemplateDetailsPage } from "./routes/TemplateDetailsPage.tsx"
+import { TemplateBuilderPage } from "./routes/TemplateBuilderPage.tsx"
 import { LaunchFormPage } from "./routes/LaunchFormPage.tsx"
 import { EnvironmentsPage } from "./routes/EnvironmentsPage.tsx"
 import { EnvironmentCreatePage } from "./routes/EnvironmentCreatePage.tsx"
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="/apps" element={<MyApplicationsPage />} />
         <Route path="/apps/:name" element={<ApplicationDetailsPage />} />
         <Route path="/store" element={<AppStorePage />} />
+        <Route path="/store/new" element={<TemplateBuilderPage />} />
         <Route path="/store/:template" element={<TemplateDetailsPage />} />
         <Route path="/store/:template/launch" element={<LaunchFormPage />} />
         <Route path="/environments" element={<EnvironmentsPage />} />

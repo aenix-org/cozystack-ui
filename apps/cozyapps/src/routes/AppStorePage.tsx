@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
-import { Search } from "lucide-react"
-import { cn } from "@cozystack/ui"
+import { Link } from "react-router"
+import { Search, Sparkles } from "lucide-react"
+import { Button, cn } from "@cozystack/ui"
 import { TEMPLATES } from "../lib/mocks/templates.ts"
 import type { TemplateCategory } from "../lib/types.ts"
 import { TemplateCard } from "../components/TemplateCard.tsx"
@@ -37,7 +38,17 @@ export function AppStorePage() {
   return (
     <div className="p-6">
       <Breadcrumb items={[{ label: "Applications", to: "/apps" }, { label: "App Store" }]} />
-      <PageHeader title="App Store" />
+      <PageHeader
+        title="App Store"
+        actions={
+          <Link to="/store/new">
+            <Button variant="primary" size="lg">
+              <Sparkles className="size-4" />
+              Create Template
+            </Button>
+          </Link>
+        }
+      />
 
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <div className="relative">
