@@ -49,32 +49,21 @@ export const PORT_TYPE: Record<PortType, PortTypeMeta> = {
 }
 
 /**
- * Subtyping graph — a TLS Secret is also a Secret (you can feed it anywhere
- * a generic Secret is accepted), but the reverse is not safe. Edges go from
- * the specialised type to the more general ancestors it satisfies.
+ * Subtyping graph — a specialised port can be fed into a more general consumer
+ * but not the other way around, and two specialisations of the same parent
+ * don't interchange (image-ref → string is fine, image-ref → ingress-host is
+ * not). Edges go from the specialised type to its ancestors.
  */
 const PORT_ANCESTORS: Partial<Record<PortType, PortType[]>> = {
   "tls-secret-ref": ["secret-ref"],
-}
-
-/**
- * Port families — string, ingress-host and image-ref are all backed by a
- * plain string at the manifest level; the dedicated types only carry a
- * colour and a UX hint, so they are interchangeable in either direction.
- */
-const PORT_FAMILY: Partial<Record<PortType, string>> = {
-  string: "string",
-  "ingress-host": "string",
-  "image-ref": "string",
+  "ingress-host": ["string"],
+  "image-ref": ["string"],
 }
 
 export function isCompatible(source: PortType, target: PortType): boolean {
   if (source === target) return true
   if (source === "any" || target === "any") return true
-  if ((PORT_ANCESTORS[source] ?? []).includes(target)) return true
-  const family = PORT_FAMILY[source]
-  if (family && PORT_FAMILY[target] === family) return true
-  return false
+  return (PORT_ANCESTORS[source] ?? []).includes(target)
 }
 
 /** Bridge ParamDef.type → PortType when a param is exposed as an input. */
