@@ -7,6 +7,7 @@ are discovered dynamically from `ApplicationDefinitions` in the cluster.
 ## Structure
 
 - `apps/console` — React + Vite SPA
+- `apps/cozyapps` — Cozy User Apps mock UI (no Kubernetes backend)
 - `packages/k8s-client` — fetch-based Kubernetes client with watch
 - `packages/ui` — shared UI components (Tailwind + Base UI)
 - `packages/types` — shared TypeScript types
@@ -27,7 +28,16 @@ kubectl proxy --port 8001
 pnpm dev
 ```
 
-The app becomes available at <http://localhost:3001/>.
+The console becomes available at <http://localhost:3001/>.
+
+To run the standalone Cozy User Apps mock UI instead (no `kubectl proxy`
+required):
+
+```sh
+pnpm dev:cozyapps
+```
+
+The mock UI becomes available at <http://localhost:3002/>.
 
 ## Build
 
@@ -35,4 +45,5 @@ The app becomes available at <http://localhost:3001/>.
 pnpm build
 ```
 
-The console is built into `apps/console/dist/`.
+The console is built into `apps/console/dist/` and the mock UI into
+`apps/cozyapps/dist/`.
