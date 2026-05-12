@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router"
 import {
   Background,
@@ -19,7 +19,7 @@ import {
   type ReactFlowInstance,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { Sparkles, Trash2, Upload } from "lucide-react"
+import { Play, Sparkles, Square, Trash2, Upload } from "lucide-react"
 import { Button } from "@cozystack/ui"
 import { Breadcrumb } from "../components/Breadcrumb.tsx"
 import { AtomNode } from "../components/builder/AtomNode.tsx"
@@ -39,6 +39,7 @@ import {
 import { isCompatible } from "../lib/builder/port-types.ts"
 import type { AtomNodeData } from "../lib/builder/types.ts"
 import { presetWordpress } from "../lib/builder/preset.ts"
+import { topologicalLevels } from "../lib/builder/run-preview.ts"
 import type { ApplicationTemplate } from "../lib/types.ts"
 
 const nodeTypes: NodeTypes = { atom: AtomNode }
@@ -82,6 +83,8 @@ function BuilderInner() {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(preset.edges)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [publishOpen, setPublishOpen] = useState(false)
+  const [running, setRunning] = useState(false)
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([])
   const reactFlowWrapper = useRef<HTMLDivElement | null>(null)
   const rfInstance = useRef<ReactFlowInstance<BuilderNode, Edge> | null>(null)
   const navigate = useNavigate()
@@ -185,6 +188,80 @@ function BuilderInner() {
     setSelectedNodeId(null)
   }, [setNodes, setEdges])
 
+  const clearTimers = useCallback(() => {
+    for (const t of timers.current) clearTimeout(t)
+    timers.current = []
+  }, [])
+
+  const stopPreview = useCallback(() => {
+    clearTimers()
+    setRunning(false)
+    setNodes((curr) =>
+      curr.map((n) => ({ ...n, data: { ...n.data, status: "idle" } })),
+    )
+    setEdges((curr) =>
+      curr.map((e) => ({ ...e, data: { ...e.data, pulsing: false } })),
+    )
+  }, [clearTimers, setEdges, setNodes])
+
+  const startPreview = useCallback(() => {
+    const levels = topologicalLevels(nodes, edges)
+    if (!levels || levels.length === 0) return
+
+    clearTimers()
+    setRunning(true)
+    setNodes((curr) =>
+      curr.map((n) => ({ ...n, data: { ...n.data, status: "queued" } })),
+    )
+    setEdges((curr) =>
+      curr.map((e) => ({ ...e, data: { ...e.data, pulsing: false } })),
+    )
+
+    const LEVEL_MS = 1200
+    const RUN_MS = 900
+
+    levels.forEach((level, i) => {
+      const ids = new Set(level)
+      const startAt = i * LEVEL_MS
+      timers.current.push(
+        setTimeout(() => {
+          setNodes((curr) =>
+            curr.map((n) =>
+              ids.has(n.id) ? { ...n, data: { ...n.data, status: "running" } } : n,
+            ),
+          )
+          setEdges((curr) =>
+            curr.map((e) =>
+              ids.has(e.target) ? { ...e, data: { ...e.data, pulsing: true } } : e,
+            ),
+          )
+        }, startAt),
+      )
+      timers.current.push(
+        setTimeout(() => {
+          setNodes((curr) =>
+            curr.map((n) =>
+              ids.has(n.id)
+                ? { ...n, data: { ...n.data, status: "succeeded" } }
+                : n,
+            ),
+          )
+          setEdges((curr) =>
+            curr.map((e) =>
+              ids.has(e.target) ? { ...e, data: { ...e.data, pulsing: false } } : e,
+            ),
+          )
+        }, startAt + RUN_MS),
+      )
+    })
+
+    timers.current.push(
+      setTimeout(() => setRunning(false), levels.length * LEVEL_MS),
+    )
+  }, [clearTimers, edges, nodes, setEdges, setNodes])
+
+  useEffect(() => clearTimers, [clearTimers])
+
   const handlePublish = useCallback(
     (draft: PublishedTemplateDraft) => {
       const template: ApplicationTemplate = {
@@ -241,15 +318,31 @@ function BuilderInner() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={resetGraph}>
+            <Button variant="outline" size="sm" onClick={resetGraph} disabled={running}>
               <Trash2 className="size-3.5" />
               Clear
             </Button>
+            {running ? (
+              <Button variant="outline" size="lg" onClick={stopPreview}>
+                <Square className="size-4" />
+                Stop
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={startPreview}
+                disabled={nodes.length === 0}
+              >
+                <Play className="size-4" />
+                Run Preview
+              </Button>
+            )}
             <Button
               variant="primary"
               size="lg"
               onClick={() => setPublishOpen(true)}
-              disabled={nodes.length === 0}
+              disabled={nodes.length === 0 || running}
             >
               <Upload className="size-4" />
               Publish to Store
