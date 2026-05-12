@@ -8,7 +8,7 @@ interface PresetGraph {
   edges: Edge[]
 }
 
-const idle: Pick<AtomNodeData, "status"> = { status: "idle" }
+const idle: Pick<AtomNodeData, "status" | "exposed"> = { status: "idle", exposed: [] }
 
 export function presetWordpress(): PresetGraph {
   const nodes: BuilderNode[] = [

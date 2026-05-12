@@ -3,8 +3,12 @@ import { Handle, Position, type NodeProps } from "@xyflow/react"
 import { CheckCircle2, Loader2, XCircle } from "lucide-react"
 import { cn } from "@cozystack/ui"
 import { findAtom, type AtomDef } from "../../lib/builder/atoms.ts"
-import { PORT_TYPE } from "../../lib/builder/port-types.ts"
-import type { AtomNodeData, RunStatus } from "../../lib/builder/types.ts"
+import { PORT_TYPE, paramTypeToPortType } from "../../lib/builder/port-types.ts"
+import {
+  paramHandleId,
+  type AtomNodeData,
+  type RunStatus,
+} from "../../lib/builder/types.ts"
 
 const HEADER_H = 36
 const PORT_ROW_H = 24
@@ -47,20 +51,33 @@ function AtomNodeImpl({ data, selected }: NodeProps) {
   const atom = findAtom(nodeData.atomType)
   if (!atom) return null
 
-  return <AtomNodeContent atom={atom} status={nodeData.status} selected={!!selected} />
+  return (
+    <AtomNodeContent
+      atom={atom}
+      status={nodeData.status}
+      exposed={nodeData.exposed ?? []}
+      selected={!!selected}
+    />
+  )
 }
 
 interface AtomNodeContentProps {
   atom: AtomDef
   status: RunStatus
+  exposed: string[]
   selected: boolean
 }
 
-function AtomNodeContent({ atom, status, selected }: AtomNodeContentProps) {
+function AtomNodeContent({ atom, status, exposed, selected }: AtomNodeContentProps) {
   const Icon = atom.icon
+  const exposedParams = atom.params.filter((p) => exposed.includes(p.key))
   const inputCount = atom.inputs.length
-  const totalPorts = inputCount + atom.outputs.length
-  const minBodyHeight = Math.max(totalPorts, 1) * PORT_ROW_H + PORTS_PAD * 2
+  const exposedCount = exposedParams.length
+  const showDivider = inputCount > 0 && exposedCount > 0
+  const leftCount = inputCount + exposedCount
+  const totalPorts = leftCount + atom.outputs.length
+  const dividerExtra = showDivider ? 6 : 0
+  const minBodyHeight = Math.max(totalPorts, 1) * PORT_ROW_H + PORTS_PAD * 2 + dividerExtra
 
   return (
     <div
@@ -109,6 +126,41 @@ function AtomNodeContent({ atom, status, selected }: AtomNodeContentProps) {
             </span>
           </div>
         ))}
+        {showDivider && (
+          <div
+            className="absolute left-3 right-3 border-t border-dashed border-slate-200"
+            style={{ top: rowTop(inputCount) - 3 }}
+          />
+        )}
+        {exposedParams.map((param, idx) => {
+          const portType = paramTypeToPortType(param.type)
+          return (
+            <div
+              key={`param-${param.key}`}
+              className="flex items-center text-xs text-slate-600"
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                top: rowTop(inputCount + idx) + dividerExtra,
+                height: PORT_ROW_H,
+              }}
+            >
+              <Handle
+                type="target"
+                position={Position.Left}
+                id={paramHandleId(param.key)}
+                style={handleStyle(portType, PORT_ROW_H / 2)}
+              />
+              <span className="ml-3 flex items-center gap-1 truncate italic">
+                {param.label}
+              </span>
+              <span className="ml-auto mr-3 font-mono text-[10px] uppercase tracking-wide text-slate-300">
+                {PORT_TYPE[portType].label}
+              </span>
+            </div>
+          )
+        })}
         {atom.outputs.map((port, idx) => (
           <div
             key={`out-${port.key}`}
@@ -117,7 +169,7 @@ function AtomNodeContent({ atom, status, selected }: AtomNodeContentProps) {
               position: "absolute",
               left: 0,
               right: 0,
-              top: rowTop(inputCount + idx),
+              top: rowTop(leftCount + idx) + dividerExtra,
               height: PORT_ROW_H,
             }}
           >

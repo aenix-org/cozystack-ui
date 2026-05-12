@@ -11,8 +11,25 @@ export const ATOM_EDGE_MARKERS = {
 export interface AtomNodeData {
   atomType: string
   params: Record<string, unknown>
+  /** Param keys promoted to input ports — replace inline editor with a handle. */
+  exposed: string[]
   status: RunStatus
   [key: string]: unknown
+}
+
+/** Handle id prefix used when a param is exposed as an input port. */
+export const PARAM_HANDLE_PREFIX = "param:"
+
+export function paramHandleId(paramKey: string): string {
+  return `${PARAM_HANDLE_PREFIX}${paramKey}`
+}
+
+export function isParamHandle(handleId: string | null | undefined): boolean {
+  return !!handleId && handleId.startsWith(PARAM_HANDLE_PREFIX)
+}
+
+export function paramKeyFromHandle(handleId: string): string {
+  return handleId.slice(PARAM_HANDLE_PREFIX.length)
 }
 
 export const STATUS_RING: Record<RunStatus, string> = {

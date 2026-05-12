@@ -39,3 +39,17 @@ export function isCompatible(source: PortType, target: PortType): boolean {
   if (source === "any" || target === "any") return true
   return false
 }
+
+/** Bridge ParamDef.type → PortType when a param is exposed as an input. */
+export function paramTypeToPortType(paramType: "string" | "number" | "boolean" | "enum"): PortType {
+  switch (paramType) {
+    case "number":
+      return "number"
+    case "boolean":
+      return "boolean"
+    case "enum":
+    case "string":
+    default:
+      return "string"
+  }
+}

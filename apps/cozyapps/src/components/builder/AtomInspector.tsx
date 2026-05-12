@@ -1,6 +1,7 @@
-import { Trash2, X } from "lucide-react"
+import { Link2, Trash2, Unlink, X } from "lucide-react"
 import { Button, cn } from "@cozystack/ui"
 import { findAtom } from "../../lib/builder/atoms.ts"
+import type { ParamDef } from "../../lib/types.ts"
 import type { AtomNodeData } from "../../lib/builder/types.ts"
 import { FormField, inputClass } from "../FormField.tsx"
 import { Toggle } from "../Toggle.tsx"
@@ -9,17 +10,75 @@ interface AtomInspectorProps {
   nodeId: string
   data: AtomNodeData
   onChange: (next: AtomNodeData) => void
+  onExposeChange: (paramKey: string, expose: boolean) => void
   onDelete: () => void
   onClose: () => void
 }
 
-export function AtomInspector({ nodeId, data, onChange, onDelete, onClose }: AtomInspectorProps) {
+export function AtomInspector({
+  nodeId,
+  data,
+  onChange,
+  onExposeChange,
+  onDelete,
+  onClose,
+}: AtomInspectorProps) {
   const atom = findAtom(data.atomType)
   if (!atom) return null
   const Icon = atom.icon
+  const exposed = data.exposed ?? []
 
   const setParam = (key: string, value: unknown) => {
     onChange({ ...data, params: { ...data.params, [key]: value } })
+  }
+
+  const renderEditor = (param: ParamDef) => {
+    const value = data.params[param.key] ?? param.defaultValue
+    if (param.type === "boolean") {
+      return (
+        <Toggle
+          checked={Boolean(value)}
+          onCheckedChange={(v) => setParam(param.key, v)}
+        />
+      )
+    }
+    if (param.type === "enum") {
+      return (
+        <select
+          className={inputClass}
+          value={String(value ?? "")}
+          onChange={(e) => setParam(param.key, e.target.value)}
+        >
+          {param.options?.map((opt) => (
+            <option key={opt} value={opt}>
+              {opt}
+            </option>
+          ))}
+        </select>
+      )
+    }
+    if (param.type === "number") {
+      return (
+        <input
+          type="number"
+          className={inputClass}
+          value={value === undefined ? "" : String(value)}
+          placeholder={param.placeholder}
+          onChange={(e) =>
+            setParam(param.key, e.target.value === "" ? "" : Number(e.target.value))
+          }
+        />
+      )
+    }
+    return (
+      <input
+        type="text"
+        className={inputClass}
+        placeholder={param.placeholder}
+        value={String(value ?? "")}
+        onChange={(e) => setParam(param.key, e.target.value)}
+      />
+    )
   }
 
   return (
@@ -53,67 +112,58 @@ export function AtomInspector({ nodeId, data, onChange, onDelete, onClose }: Ato
         {atom.params.length > 0 ? (
           <div className="space-y-3">
             {atom.params.map((param) => {
-              const value = data.params[param.key] ?? param.defaultValue
-              if (param.type === "boolean") {
-                return (
-                  <FormField
-                    key={param.key}
-                    label={param.label}
-                    hint={param.hint}
-                    inline
-                  >
-                    <Toggle
-                      checked={Boolean(value)}
-                      onCheckedChange={(v) => setParam(param.key, v)}
-                    />
-                  </FormField>
-                )
-              }
-              if (param.type === "enum") {
-                return (
-                  <FormField key={param.key} label={param.label} hint={param.hint}>
-                    <select
-                      className={inputClass}
-                      value={String(value ?? "")}
-                      onChange={(e) => setParam(param.key, e.target.value)}
-                    >
-                      {param.options?.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-                  </FormField>
-                )
-              }
-              if (param.type === "number") {
-                return (
-                  <FormField key={param.key} label={param.label} hint={param.hint}>
-                    <input
-                      type="number"
-                      className={inputClass}
-                      value={value === undefined ? "" : String(value)}
-                      placeholder={param.placeholder}
-                      onChange={(e) =>
-                        setParam(
-                          param.key,
-                          e.target.value === "" ? "" : Number(e.target.value),
-                        )
-                      }
-                    />
-                  </FormField>
-                )
-              }
+              const isExposed = exposed.includes(param.key)
+              const inline = !isExposed && param.type === "boolean"
               return (
-                <FormField key={param.key} label={param.label} hint={param.hint}>
-                  <input
-                    type="text"
-                    className={inputClass}
-                    placeholder={param.placeholder}
-                    value={String(value ?? "")}
-                    onChange={(e) => setParam(param.key, e.target.value)}
-                  />
-                </FormField>
+                <div
+                  key={param.key}
+                  className="rounded-md border border-slate-200 bg-slate-50/40 p-3"
+                >
+                  <div className="mb-1.5 flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-slate-700">
+                      {param.label}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onExposeChange(param.key, !isExposed)}
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors",
+                        isExposed
+                          ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                          : "text-slate-400 hover:bg-slate-100 hover:text-slate-700",
+                      )}
+                      title={isExposed ? "Unbind and edit inline" : "Expose as input port"}
+                    >
+                      {isExposed ? (
+                        <>
+                          <Unlink className="size-3" />
+                          Unbind
+                        </>
+                      ) : (
+                        <>
+                          <Link2 className="size-3" />
+                          Expose
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  {isExposed ? (
+                    <div className="rounded-md border border-dashed border-blue-200 bg-blue-50/60 px-2 py-1.5 text-xs italic text-blue-700">
+                      From upstream — connect a value
+                    </div>
+                  ) : inline ? (
+                    <FormField label="" hint={param.hint} inline>
+                      {renderEditor(param)}
+                    </FormField>
+                  ) : (
+                    <>
+                      {renderEditor(param)}
+                      {param.hint && (
+                        <p className="mt-1 text-xs text-slate-500">{param.hint}</p>
+                      )}
+                    </>
+                  )}
+                </div>
               )
             })}
           </div>

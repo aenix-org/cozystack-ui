@@ -36,8 +36,14 @@ import {
   findAtom,
   type AtomDef,
 } from "../lib/builder/atoms.ts"
-import { isCompatible } from "../lib/builder/port-types.ts"
-import { ATOM_EDGE_MARKERS, type AtomNodeData } from "../lib/builder/types.ts"
+import { isCompatible, paramTypeToPortType } from "../lib/builder/port-types.ts"
+import {
+  ATOM_EDGE_MARKERS,
+  isParamHandle,
+  paramHandleId,
+  paramKeyFromHandle,
+  type AtomNodeData,
+} from "../lib/builder/types.ts"
 import { presetWordpress } from "../lib/builder/preset.ts"
 import { topologicalLevels } from "../lib/builder/run-preview.ts"
 import type { ApplicationTemplate } from "../lib/types.ts"
@@ -104,9 +110,23 @@ function BuilderInner() {
       const targetAtom = findAtom(targetNode.data.atomType)
       if (!sourceAtom || !targetAtom) return
       const sourcePort = sourceAtom.outputs.find((p) => p.key === connection.sourceHandle)
-      const targetPort = targetAtom.inputs.find((p) => p.key === connection.targetHandle)
-      if (!sourcePort || !targetPort) return
-      if (!isCompatible(sourcePort.type, targetPort.type)) return
+      if (!sourcePort) return
+
+      let targetType
+      if (isParamHandle(connection.targetHandle)) {
+        const paramKey = paramKeyFromHandle(connection.targetHandle as string)
+        const exposed = targetNode.data.exposed ?? []
+        if (!exposed.includes(paramKey)) return
+        const param = targetAtom.params.find((p) => p.key === paramKey)
+        if (!param) return
+        targetType = paramTypeToPortType(param.type)
+      } else {
+        const port = targetAtom.inputs.find((p) => p.key === connection.targetHandle)
+        if (!port) return
+        targetType = port.type
+      }
+
+      if (!isCompatible(sourcePort.type, targetType)) return
       setEdges((eds) =>
         addEdge(
           {
@@ -147,6 +167,7 @@ function BuilderInner() {
           data: {
             atomType,
             params: defaultParams(atom),
+            exposed: [],
             status: "idle",
           },
         }
@@ -172,6 +193,33 @@ function BuilderInner() {
       )
     },
     [selectedNodeId, setNodes],
+  )
+
+  const toggleParamExposure = useCallback(
+    (paramKey: string, expose: boolean) => {
+      if (!selectedNodeId) return
+      const handleId = paramHandleId(paramKey)
+      setNodes((current) =>
+        current.map((n) => {
+          if (n.id !== selectedNodeId) return n
+          const exposed = n.data.exposed ?? []
+          const nextExposed = expose
+            ? exposed.includes(paramKey)
+              ? exposed
+              : [...exposed, paramKey]
+            : exposed.filter((k) => k !== paramKey)
+          return { ...n, data: { ...n.data, exposed: nextExposed } }
+        }),
+      )
+      if (!expose) {
+        setEdges((current) =>
+          current.filter(
+            (e) => !(e.target === selectedNodeId && e.targetHandle === handleId),
+          ),
+        )
+      }
+    },
+    [selectedNodeId, setEdges, setNodes],
   )
 
   const deleteSelectedNode = useCallback(() => {
@@ -394,6 +442,7 @@ function BuilderInner() {
             nodeId={selectedNode.id}
             data={selectedNode.data}
             onChange={updateSelectedNode}
+            onExposeChange={toggleParamExposure}
             onDelete={deleteSelectedNode}
             onClose={() => setSelectedNodeId(null)}
           />
