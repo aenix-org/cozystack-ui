@@ -1,5 +1,5 @@
 import type { Edge, Node } from "@xyflow/react"
-import type { AtomNodeData } from "./types.ts"
+import { ATOM_EDGE_MARKERS, type AtomNodeData } from "./types.ts"
 
 type BuilderNode = Node<AtomNodeData>
 
@@ -86,15 +86,6 @@ export function presetWordpress(): PresetGraph {
 
   const edges: Edge[] = [
     {
-      id: "input->db",
-      source: "input",
-      target: "db",
-      sourceHandle: "name",
-      targetHandle: "values",
-      type: "atom",
-      data: { portType: "string" },
-    },
-    {
       id: "db->app",
       source: "db",
       target: "app",
@@ -159,5 +150,8 @@ export function presetWordpress(): PresetGraph {
     },
   ]
 
-  return { nodes, edges }
+  return {
+    nodes,
+    edges: edges.map((e) => ({ ...e, markerEnd: ATOM_EDGE_MARKERS })),
+  }
 }

@@ -37,7 +37,7 @@ import {
   type AtomDef,
 } from "../lib/builder/atoms.ts"
 import { isCompatible } from "../lib/builder/port-types.ts"
-import type { AtomNodeData } from "../lib/builder/types.ts"
+import { ATOM_EDGE_MARKERS, type AtomNodeData } from "../lib/builder/types.ts"
 import { presetWordpress } from "../lib/builder/preset.ts"
 import { topologicalLevels } from "../lib/builder/run-preview.ts"
 import type { ApplicationTemplate } from "../lib/types.ts"
@@ -113,6 +113,7 @@ function BuilderInner() {
             ...connection,
             type: "atom",
             data: { portType: sourcePort.type },
+            markerEnd: ATOM_EDGE_MARKERS,
           },
           eds,
         ),
@@ -369,7 +370,7 @@ function BuilderInner() {
             onPaneClick={() => setSelectedNodeId(null)}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
-            defaultEdgeOptions={{ type: "atom" }}
+            defaultEdgeOptions={{ type: "atom", markerEnd: ATOM_EDGE_MARKERS }}
             fitView
             fitViewOptions={{ padding: 0.2 }}
             proOptions={{ hideAttribution: true }}

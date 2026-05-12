@@ -1,4 +1,12 @@
+import { MarkerType } from "@xyflow/react"
+
 export type RunStatus = "idle" | "queued" | "running" | "succeeded" | "failed"
+
+export const ATOM_EDGE_MARKERS = {
+  type: MarkerType.ArrowClosed,
+  width: 14,
+  height: 14,
+}
 
 export interface AtomNodeData {
   atomType: string
