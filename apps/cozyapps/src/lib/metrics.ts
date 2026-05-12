@@ -8,6 +8,28 @@ export interface LogLine {
   message: string
 }
 
+export type SyncState = "in-sync" | "drift" | "reconciling" | "failed"
+
+export type ReconcileTrigger = "cron" | "spec-change" | "upstream-change" | "manual"
+export type ReconcileResult = "changed" | "noop" | "failed"
+
+export interface OutputDiff {
+  atom: string
+  port: string
+  before: string
+  after: string
+}
+
+export interface ReconcileRun {
+  id: string
+  startedAt: string
+  durationMs: number
+  trigger: ReconcileTrigger
+  result: ReconcileResult
+  outputDiffs: OutputDiff[]
+  affectedAtoms: string[]
+}
+
 export interface ApplicationMetrics {
   uptime: {
     last24h: number
@@ -41,6 +63,8 @@ export interface ApplicationMetrics {
     lastDeployAt: string
   }
   logs: LogLine[]
+  syncState: SyncState
+  reconcileRuns: ReconcileRun[]
 }
 
 /** Seeded RNG — deterministic from a string seed (FNV-1a + mulberry32). */
@@ -142,6 +166,76 @@ function generateLogs(rng: () => number, count: number, baseTs: number): LogLine
   return logs.reverse()
 }
 
+const DIFF_TEMPLATES: { atom: string; port: string; before: string; after: string }[] = [
+  { atom: "container", port: "image-ref", before: "wordpress:6.4.1", after: "wordpress:6.4.2" },
+  { atom: "container", port: "image-ref", before: "node:20.10", after: "node:20.11" },
+  { atom: "postgres", port: "credentials", before: "rev-a142", after: "rev-a143" },
+  { atom: "tls-cert", port: "tls-secret-ref", before: "expires 5d", after: "renewed 90d" },
+  { atom: "redis", port: "credentials", before: "rev-r089", after: "rev-r090" },
+  { atom: "ingress", port: "tls", before: "drifted", after: "applied" },
+  { atom: "service", port: "service-ref", before: "endpoints=2", after: "endpoints=3" },
+  { atom: "container", port: "workload", before: "replicas=1", after: "replicas=2" },
+]
+
+const TRIGGERS: ReconcileTrigger[] = [
+  "cron",
+  "cron",
+  "cron",
+  "spec-change",
+  "upstream-change",
+  "upstream-change",
+  "manual",
+]
+
+function generateReconcileRuns(
+  rng: () => number,
+  baseTs: number,
+  syncState: SyncState,
+): ReconcileRun[] {
+  const runs: ReconcileRun[] = []
+  let ts = baseTs
+  const count = 14
+  for (let i = 0; i < count; i += 1) {
+    ts -= rangeInt(rng, 4 * 60 * 1000, 80 * 60 * 1000)
+    const trigger = TRIGGERS[Math.floor(rng() * TRIGGERS.length)]
+    const isChanged =
+      i === 0 && syncState === "reconciling"
+        ? true
+        : i === 1 && syncState === "drift"
+          ? false
+          : rng() < (trigger === "cron" ? 0.18 : 0.7)
+    const isFailed = !isChanged ? false : rng() < 0.06
+    const result: ReconcileResult = isFailed ? "failed" : isChanged ? "changed" : "noop"
+    const diffCount = result === "changed" ? rangeInt(rng, 1, 3) : 0
+    const diffs: OutputDiff[] = []
+    const usedAtoms = new Set<string>()
+    for (let d = 0; d < diffCount; d += 1) {
+      const tpl = DIFF_TEMPLATES[Math.floor(rng() * DIFF_TEMPLATES.length)]
+      if (usedAtoms.has(tpl.atom)) continue
+      usedAtoms.add(tpl.atom)
+      diffs.push({ ...tpl })
+    }
+    runs.push({
+      id: `rec-${(baseTs - ts).toString(36)}`,
+      startedAt: new Date(ts).toISOString(),
+      durationMs: rangeInt(rng, 1_200, result === "changed" ? 38_000 : 8_000),
+      trigger,
+      result,
+      outputDiffs: diffs,
+      affectedAtoms: Array.from(usedAtoms),
+    })
+  }
+  return runs
+}
+
+function pickSyncState(rng: () => number, status: Application["status"]): SyncState {
+  if (status === "Failed") return "failed"
+  if (status === "Installing" || status === "Upgrading" || status === "Starting")
+    return "reconciling"
+  if (rng() < 0.12) return "drift"
+  return "in-sync"
+}
+
 export function generateMetrics(app: Application, now: number = Date.now()): ApplicationMetrics {
   const rng = seedFrom(app.name)
   const cpuTotal = [1, 2, 4, 8][rangeInt(rng, 0, 3)]
@@ -193,5 +287,7 @@ export function generateMetrics(app: Application, now: number = Date.now()): App
       lastDeployAt: new Date(now - rangeInt(rng, 10, 6 * 24 * 60) * 60 * 1000).toISOString(),
     },
     logs: generateLogs(rng, 40, now),
+    syncState: pickSyncState(rng, app.status),
+    reconcileRuns: generateReconcileRuns(rng, now, pickSyncState(rng, app.status)),
   }
 }

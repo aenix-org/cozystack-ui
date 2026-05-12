@@ -6,13 +6,12 @@ import {
   CircleDollarSign,
   Gauge,
   RefreshCw,
-  Rocket,
   Trash2,
 } from "lucide-react"
 import { Button, Section, StatusBadge } from "@cozystack/ui"
 import { addAction, findApplication, useApplications } from "../lib/mock-store.ts"
 import { applicationStatusTone } from "../lib/status.ts"
-import { formatDateTime, timeAgo } from "../lib/humanize.ts"
+import { formatDateTime } from "../lib/humanize.ts"
 import { nowIso } from "../lib/clock.ts"
 import { generateMetrics } from "../lib/metrics.ts"
 import { Breadcrumb } from "../components/Breadcrumb.tsx"
@@ -24,6 +23,10 @@ import { MetricStatCard } from "../components/MetricStatCard.tsx"
 import { UsageBar } from "../components/UsageBar.tsx"
 import { Sparkline } from "../components/Sparkline.tsx"
 import { LogsViewer } from "../components/LogsViewer.tsx"
+import {
+  ReconcileRunsTimeline,
+  SyncStateBadge,
+} from "../components/ReconcileRunsTimeline.tsx"
 
 export function ApplicationDetailsPage() {
   // Subscribe to the store so mutations (status changes, new actions) re-render.
@@ -81,7 +84,6 @@ export function ApplicationDetailsPage() {
       : metrics.pods.ready === 0
         ? "error"
         : "warn"
-  const maxDeploys = Math.max(1, ...metrics.delivery.deploys7d)
 
   return (
     <div className="p-6">
@@ -91,6 +93,7 @@ export function ApplicationDetailsPage() {
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold text-slate-900">{app.name}</h1>
           <StatusBadge tone={applicationStatusTone(app.status)}>{app.status}</StatusBadge>
+          <SyncStateBadge state={metrics.syncState} />
         </div>
         <ActionsMenu
           dividerBeforeIndex={2}
@@ -178,43 +181,17 @@ export function ApplicationDetailsPage() {
           </div>
         </Section>
 
-        <Section title="Delivery">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <MetricStatCard
-              icon={<Rocket className="size-3" />}
-              label="Deploys · 7d"
-              value={metrics.delivery.deploysPerWeek}
-              hint={`Last ${timeAgo(metrics.delivery.lastDeployAt)}`}
-            />
-            <div className="md:col-span-2 rounded-lg border border-slate-200 bg-white p-4">
-              <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-slate-500">
-                Deploys per day · last 7d
-              </div>
-              <div className="flex h-16 items-end gap-1.5">
-                {metrics.delivery.deploys7d.map((count, idx) => {
-                  const h = Math.max(4, (count / maxDeploys) * 56)
-                  return (
-                    <div
-                      key={idx}
-                      className="group flex flex-1 flex-col items-center justify-end gap-1"
-                    >
-                      <span className="text-[10px] text-slate-400 group-hover:text-slate-700">
-                        {count}
-                      </span>
-                      <div
-                        className="w-full rounded-sm bg-blue-500/80 group-hover:bg-blue-600"
-                        style={{ height: h }}
-                      />
-                    </div>
-                  )
-                })}
-              </div>
-              <div className="mt-1 flex justify-between font-mono text-[10px] text-slate-400">
-                <span>-6d</span>
-                <span>today</span>
-              </div>
-            </div>
-          </div>
+        <Section
+          title="Reconcile Runs"
+          description="Every change — spec, drift, or upstream output — runs through one reconcile workflow"
+          actions={
+            <span className="text-xs text-slate-500">
+              {metrics.reconcileRuns.filter((r) => r.result === "changed").length} changed ·{" "}
+              {metrics.reconcileRuns.filter((r) => r.result === "noop").length} noop
+            </span>
+          }
+        >
+          <ReconcileRunsTimeline runs={metrics.reconcileRuns} />
         </Section>
 
         <Section title="Logs">
