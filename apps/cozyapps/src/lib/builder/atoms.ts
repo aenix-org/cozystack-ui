@@ -28,10 +28,8 @@ export interface PortDef {
 
 export type AtomCategory =
   | "Inputs"
-  | "Managed Services"
   | "K8s Primitives"
-  | "Compute"
-  | "Network"
+  | "Managed Services"
   | "Outputs"
 
 export interface AtomDef {
@@ -74,88 +72,57 @@ export const ATOMS: AtomDef[] = [
     ],
   },
 
-  // ─── Managed Services (high-level — render k8s primitives under the hood) ─
+  // ─── K8s Primitives ───────────────────────────────────────────────────
   {
-    type: "postgres",
-    displayName: "Postgres",
-    category: "Managed Services",
-    description: "Managed PostgreSQL cluster — emits a Secret with credentials and a Service",
-    icon: Database,
-    accentBg: "bg-blue-50",
-    accentFg: "text-blue-600",
-    inputs: [],
-    outputs: [
-      { key: "credentials", label: "credentials", type: "secret-ref" },
-      { key: "service", label: "service", type: "service-ref" },
+    type: "container",
+    displayName: "Container",
+    category: "K8s Primitives",
+    description: "Deployment — pulls env from Secrets/ConfigMaps, mounts PVCs",
+    icon: Container,
+    accentBg: "bg-emerald-50",
+    accentFg: "text-emerald-600",
+    inputs: [
+      { key: "image", label: "image", type: "image-ref" },
+      { key: "envFromSecret", label: "envFrom (secret)", type: "secret-ref", multi: true },
+      { key: "envFromConfig", label: "envFrom (config)", type: "configmap-ref", multi: true },
+      { key: "volumes", label: "volumes", type: "pvc-ref", multi: true },
+      { key: "serviceAccount", label: "serviceAccount", type: "serviceaccount-ref" },
     ],
+    outputs: [{ key: "workload", label: "workload", type: "workload-ref" }],
     params: [
       {
-        key: "version",
-        label: "Version",
-        type: "enum",
-        options: ["14", "15", "16"],
-        defaultValue: "15",
+        key: "image",
+        label: "Image (literal)",
+        type: "string",
+        placeholder: "wordpress:6.4",
+        hint: "Used when no image-ref is connected",
       },
-      {
-        key: "storage",
-        label: "Storage",
-        type: "enum",
-        options: ["10 GB", "20 GB", "50 GB", "100 GB"],
-        defaultValue: "10 GB",
-      },
+      { key: "port", label: "Container port", type: "number", defaultValue: 80 },
       { key: "replicas", label: "Replicas", type: "number", defaultValue: 1 },
     ],
   },
   {
-    type: "redis",
-    displayName: "Redis",
-    category: "Managed Services",
-    description: "Managed Redis — emits a Secret with password and a Service",
-    icon: Database,
-    accentBg: "bg-red-50",
-    accentFg: "text-red-600",
-    inputs: [],
-    outputs: [
-      { key: "credentials", label: "credentials", type: "secret-ref" },
-      { key: "service", label: "service", type: "service-ref" },
-    ],
+    type: "service",
+    displayName: "Service",
+    category: "K8s Primitives",
+    description: "Cluster-internal endpoint that selects a workload by label",
+    icon: Network,
+    accentBg: "bg-emerald-50",
+    accentFg: "text-emerald-600",
+    inputs: [{ key: "selector", label: "selector", type: "workload-ref" }],
+    outputs: [{ key: "ref", label: "ref", type: "service-ref" }],
     params: [
+      { key: "name", label: "Name", type: "string", placeholder: "backend", required: true },
+      { key: "port", label: "Port", type: "number", defaultValue: 8080 },
       {
-        key: "memory",
-        label: "Memory",
+        key: "type",
+        label: "Type",
         type: "enum",
-        options: ["256 MB", "1 GB", "4 GB"],
-        defaultValue: "1 GB",
+        options: ["ClusterIP", "NodePort", "LoadBalancer"],
+        defaultValue: "ClusterIP",
       },
-      { key: "persistence", label: "Persistence", type: "boolean", defaultValue: false },
     ],
   },
-  {
-    type: "s3-bucket",
-    displayName: "S3 / MinIO Bucket",
-    category: "Managed Services",
-    description: "Object storage — emits a Secret with access keys and a Service endpoint",
-    icon: HardDrive,
-    accentBg: "bg-orange-50",
-    accentFg: "text-orange-600",
-    inputs: [],
-    outputs: [
-      { key: "credentials", label: "credentials", type: "secret-ref" },
-      { key: "service", label: "service", type: "service-ref" },
-    ],
-    params: [
-      {
-        key: "region",
-        label: "Region",
-        type: "enum",
-        options: ["eu-central-1", "eu-west-1", "us-east-1"],
-        defaultValue: "eu-central-1",
-      },
-      { key: "versioning", label: "Versioning", type: "boolean", defaultValue: true },
-    ],
-  },
-
-  // ─── K8s Primitives ───────────────────────────────────────────────────
   {
     type: "secret",
     displayName: "Secret",
@@ -173,7 +140,7 @@ export const ATOMS: AtomDef[] = [
         label: "Keys",
         type: "string",
         placeholder: "username, password",
-        hint: "Comma-separated list of keys held by this Secret",
+        hint: "Comma-separated list of keys",
       },
     ],
   },
@@ -253,87 +220,29 @@ export const ATOMS: AtomDef[] = [
     ],
   },
   {
-    type: "service",
-    displayName: "Service",
+    type: "ingress",
+    displayName: "Ingress",
     category: "K8s Primitives",
-    description: "Cluster-internal endpoint for a workload",
-    icon: Network,
-    accentBg: "bg-emerald-50",
-    accentFg: "text-emerald-600",
-    inputs: [],
-    outputs: [{ key: "ref", label: "ref", type: "service-ref" }],
-    params: [
-      { key: "name", label: "Name", type: "string", placeholder: "backend", required: true },
-      { key: "port", label: "Port", type: "number", defaultValue: 8080 },
-      {
-        key: "type",
-        label: "Type",
-        type: "enum",
-        options: ["ClusterIP", "NodePort", "LoadBalancer"],
-        defaultValue: "ClusterIP",
-      },
-    ],
-  },
-
-  // ─── Compute ──────────────────────────────────────────────────────────
-  {
-    type: "container",
-    displayName: "Container",
-    category: "Compute",
-    description: "Deployment — pulls envs from Secrets/ConfigMaps and mounts PVCs",
-    icon: Container,
-    accentBg: "bg-emerald-50",
-    accentFg: "text-emerald-600",
+    description: "HTTP/S router — accepts a backend Service, a host and a TLS Secret",
+    icon: Globe,
+    accentBg: "bg-indigo-50",
+    accentFg: "text-indigo-600",
     inputs: [
-      { key: "image", label: "image", type: "image-ref" },
-      { key: "envFromSecret", label: "envFrom (secret)", type: "secret-ref", multi: true },
-      { key: "envFromConfig", label: "envFrom (config)", type: "configmap-ref", multi: true },
-      { key: "volumes", label: "volumes", type: "pvc-ref", multi: true },
-      { key: "serviceAccount", label: "serviceAccount", type: "serviceaccount-ref" },
+      { key: "backend", label: "backend", type: "service-ref" },
+      { key: "host", label: "host", type: "ingress-host" },
+      { key: "tls", label: "tls", type: "tls-secret-ref" },
     ],
-    outputs: [{ key: "service", label: "service", type: "service-ref" }],
+    outputs: [{ key: "url", label: "public url", type: "string" }],
     params: [
-      {
-        key: "image",
-        label: "Image (literal)",
-        type: "string",
-        placeholder: "wordpress:6.4",
-        hint: "Used when no image-ref is connected",
-      },
-      { key: "port", label: "Port", type: "number", defaultValue: 80 },
-      { key: "replicas", label: "Replicas", type: "number", defaultValue: 1 },
+      { key: "path", label: "Path prefix", type: "string", defaultValue: "/" },
+      { key: "rateLimit", label: "Rate limit (req/s)", type: "number", defaultValue: 100 },
     ],
   },
-  {
-    type: "helm-chart",
-    displayName: "Helm Chart",
-    category: "Compute",
-    description: "Install a Helm chart — outputs the primary Service it creates",
-    icon: Package,
-    accentBg: "bg-emerald-50",
-    accentFg: "text-emerald-600",
-    inputs: [
-      { key: "values", label: "values", type: "any", multi: true },
-    ],
-    outputs: [{ key: "service", label: "service", type: "service-ref" }],
-    params: [
-      {
-        key: "chart",
-        label: "Chart",
-        type: "string",
-        placeholder: "bitnami/wordpress",
-        required: true,
-      },
-      { key: "version", label: "Version", type: "string", placeholder: "17.0.4" },
-    ],
-  },
-
-  // ─── Network ──────────────────────────────────────────────────────────
   {
     type: "tls-cert",
     displayName: "TLS Cert",
-    category: "Network",
-    description: "Issues a Let's Encrypt certificate as a kubernetes.io/tls Secret",
+    category: "K8s Primitives",
+    description: "Let's Encrypt Certificate (cert-manager) — produces a kubernetes.io/tls Secret",
     icon: ShieldCheck,
     accentBg: "bg-rose-50",
     accentFg: "text-rose-600",
@@ -349,23 +258,106 @@ export const ATOMS: AtomDef[] = [
       },
     ],
   },
+
+  // ─── Managed Services ─────────────────────────────────────────────────
   {
-    type: "ingress",
-    displayName: "Ingress",
-    category: "Network",
-    description: "HTTP/S router — accepts a backend Service, a host and a TLS Secret",
-    icon: Globe,
-    accentBg: "bg-indigo-50",
-    accentFg: "text-indigo-600",
-    inputs: [
-      { key: "backend", label: "backend", type: "service-ref" },
-      { key: "host", label: "host", type: "ingress-host" },
-      { key: "tls", label: "tls", type: "tls-secret-ref" },
+    type: "postgres",
+    displayName: "Postgres",
+    category: "Managed Services",
+    description: "Managed PostgreSQL cluster — emits a Secret with credentials and a Service",
+    icon: Database,
+    accentBg: "bg-blue-50",
+    accentFg: "text-blue-600",
+    inputs: [],
+    outputs: [
+      { key: "credentials", label: "credentials", type: "secret-ref" },
+      { key: "service", label: "service", type: "service-ref" },
     ],
-    outputs: [{ key: "url", label: "public url", type: "string" }],
     params: [
-      { key: "path", label: "Path prefix", type: "string", defaultValue: "/" },
-      { key: "rateLimit", label: "Rate limit (req/s)", type: "number", defaultValue: 100 },
+      {
+        key: "version",
+        label: "Version",
+        type: "enum",
+        options: ["14", "15", "16"],
+        defaultValue: "15",
+      },
+      {
+        key: "storage",
+        label: "Storage",
+        type: "enum",
+        options: ["10 GB", "20 GB", "50 GB", "100 GB"],
+        defaultValue: "10 GB",
+      },
+      { key: "replicas", label: "Replicas", type: "number", defaultValue: 1 },
+    ],
+  },
+  {
+    type: "redis",
+    displayName: "Redis",
+    category: "Managed Services",
+    description: "Managed Redis — emits a Secret with password and a Service",
+    icon: Database,
+    accentBg: "bg-red-50",
+    accentFg: "text-red-600",
+    inputs: [],
+    outputs: [
+      { key: "credentials", label: "credentials", type: "secret-ref" },
+      { key: "service", label: "service", type: "service-ref" },
+    ],
+    params: [
+      {
+        key: "memory",
+        label: "Memory",
+        type: "enum",
+        options: ["256 MB", "1 GB", "4 GB"],
+        defaultValue: "1 GB",
+      },
+      { key: "persistence", label: "Persistence", type: "boolean", defaultValue: false },
+    ],
+  },
+  {
+    type: "s3-bucket",
+    displayName: "S3 / MinIO Bucket",
+    category: "Managed Services",
+    description: "Object storage — emits a Secret with access keys and a Service endpoint",
+    icon: HardDrive,
+    accentBg: "bg-orange-50",
+    accentFg: "text-orange-600",
+    inputs: [],
+    outputs: [
+      { key: "credentials", label: "credentials", type: "secret-ref" },
+      { key: "service", label: "service", type: "service-ref" },
+    ],
+    params: [
+      {
+        key: "region",
+        label: "Region",
+        type: "enum",
+        options: ["eu-central-1", "eu-west-1", "us-east-1"],
+        defaultValue: "eu-central-1",
+      },
+      { key: "versioning", label: "Versioning", type: "boolean", defaultValue: true },
+    ],
+  },
+  {
+    type: "helm-chart",
+    displayName: "Helm Chart",
+    category: "Managed Services",
+    description: "Install a Helm chart — surfaces the primary Service it creates",
+    icon: Package,
+    accentBg: "bg-emerald-50",
+    accentFg: "text-emerald-600",
+    inputs: [{ key: "values", label: "values", type: "any", multi: true }],
+    outputs: [{ key: "service", label: "service", type: "service-ref" }],
+    params: [
+      {
+        key: "chart",
+        label: "Chart",
+        type: "string",
+        placeholder: "bitnami/wordpress",
+        required: true,
+      },
+      { key: "version", label: "Version", type: "string", placeholder: "17.0.4" },
     ],
   },
 
@@ -388,19 +380,15 @@ export const ATOMS: AtomDef[] = [
 
 export const CATEGORY_ORDER: AtomCategory[] = [
   "Inputs",
-  "Managed Services",
   "K8s Primitives",
-  "Compute",
-  "Network",
+  "Managed Services",
   "Outputs",
 ]
 
 const CATEGORY_ICONS: Record<AtomCategory, LucideIcon> = {
   Inputs: FormInput,
-  "Managed Services": Database,
   "K8s Primitives": Box,
-  Compute: Container,
-  Network: Globe,
+  "Managed Services": Database,
   Outputs: Layers,
 }
 

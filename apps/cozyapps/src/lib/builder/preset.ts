@@ -25,7 +25,7 @@ export function presetWordpress(): PresetGraph {
     {
       id: "db",
       type: "atom",
-      position: { x: 360, y: -160 },
+      position: { x: 360, y: -200 },
       data: {
         atomType: "postgres",
         params: { version: "15", storage: "10 GB", replicas: 1 },
@@ -45,7 +45,7 @@ export function presetWordpress(): PresetGraph {
     {
       id: "app",
       type: "atom",
-      position: { x: 740, y: -20 },
+      position: { x: 740, y: -40 },
       data: {
         atomType: "container",
         params: { image: "wordpress:6.4", port: 80, replicas: 2 },
@@ -53,9 +53,19 @@ export function presetWordpress(): PresetGraph {
       },
     },
     {
+      id: "svc",
+      type: "atom",
+      position: { x: 1120, y: 60 },
+      data: {
+        atomType: "service",
+        params: { name: "wordpress", port: 80, type: "ClusterIP" },
+        ...idle,
+      },
+    },
+    {
       id: "tls",
       type: "atom",
-      position: { x: 1120, y: -180 },
+      position: { x: 1120, y: -200 },
       data: {
         atomType: "tls-cert",
         params: { issuer: "letsencrypt-prod" },
@@ -65,7 +75,7 @@ export function presetWordpress(): PresetGraph {
     {
       id: "ingress",
       type: "atom",
-      position: { x: 1120, y: 80 },
+      position: { x: 1500, y: 60 },
       data: {
         atomType: "ingress",
         params: { path: "/", rateLimit: 100 },
@@ -75,7 +85,7 @@ export function presetWordpress(): PresetGraph {
     {
       id: "out",
       type: "atom",
-      position: { x: 1480, y: 80 },
+      position: { x: 1860, y: 60 },
       data: {
         atomType: "output",
         params: { label: "Public URL" },
@@ -104,6 +114,15 @@ export function presetWordpress(): PresetGraph {
       data: { portType: "secret-ref" },
     },
     {
+      id: "app->svc",
+      source: "app",
+      target: "svc",
+      sourceHandle: "workload",
+      targetHandle: "selector",
+      type: "atom",
+      data: { portType: "workload-ref" },
+    },
+    {
       id: "input-host->tls",
       source: "input",
       target: "tls",
@@ -113,10 +132,10 @@ export function presetWordpress(): PresetGraph {
       data: { portType: "ingress-host" },
     },
     {
-      id: "app-svc->ingress",
-      source: "app",
+      id: "svc->ingress",
+      source: "svc",
       target: "ingress",
-      sourceHandle: "service",
+      sourceHandle: "ref",
       targetHandle: "backend",
       type: "atom",
       data: { portType: "service-ref" },

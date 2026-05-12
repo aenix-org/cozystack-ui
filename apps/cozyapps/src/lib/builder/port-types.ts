@@ -13,6 +13,7 @@ export type PortType =
   | "service-ref"
   | "pvc-ref"
   | "serviceaccount-ref"
+  | "workload-ref"
   // string-ish literals that carry semantic meaning at the manifest level
   | "image-ref"
   | "ingress-host"
@@ -38,6 +39,7 @@ export const PORT_TYPE: Record<PortType, PortTypeMeta> = {
   "service-ref": { label: "Service", color: "bg-emerald-500", stroke: "#10b981" },
   "pvc-ref": { label: "PVC", color: "bg-orange-500", stroke: "#f97316" },
   "serviceaccount-ref": { label: "ServiceAccount", color: "bg-yellow-500", stroke: "#eab308" },
+  "workload-ref": { label: "Workload", color: "bg-teal-500", stroke: "#14b8a6" },
   "image-ref": { label: "Image", color: "bg-indigo-500", stroke: "#6366f1" },
   "ingress-host": { label: "Host", color: "bg-violet-500", stroke: "#8b5cf6" },
   string: { label: "String", color: "bg-slate-400", stroke: "#94a3b8" },
