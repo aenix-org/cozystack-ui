@@ -164,12 +164,9 @@ export function ApplicationDetailsPage() {
 
         <Section
           title="Topology"
-          description="What actually runs in the cluster — atoms and the k8s objects they own"
+          description="Atoms and the conditions reported by their status workflow"
           actions={
-            <span className="text-xs text-slate-500">
-              {topology.length} atoms ·{" "}
-              {topology.reduce((sum, a) => sum + a.resources.length, 0)} objects
-            </span>
+            <span className="text-xs text-slate-500">{topology.length} atoms</span>
           }
         >
           <TopologySection topology={topology} />

@@ -2,107 +2,34 @@ import type { Application } from "./types.ts"
 
 export type AtomStatus = "healthy" | "reconciling" | "drift" | "failed" | "pending"
 
-export type K8sKind =
-  | "Pod"
-  | "Service"
-  | "Secret"
-  | "ConfigMap"
-  | "PersistentVolumeClaim"
-  | "Ingress"
-  | "ServiceAccount"
+export type SubstatusState = "ok" | "warn" | "error" | "unknown" | "info"
 
-export type PodPhase = "Running" | "Pending" | "Succeeded" | "Failed" | "CrashLoopBackOff"
-
-export interface PodResource {
-  kind: "Pod"
-  name: string
-  phase: PodPhase
-  ready: string
-  restarts: number
-  age: string
-  image: string
-  node: string
+/**
+ * One condition reported by the atom's status workflow. Mirrors the
+ * k8s Conditions API — atom-author declares the type set they publish.
+ * Pods, Services, Secrets and other materialised objects are intentionally
+ * *not* exposed — the atom is a black box whose contract is its
+ * outputs (ports) and its published substatuses.
+ */
+export interface Substatus {
+  type: string
+  state: SubstatusState
+  reason?: string
+  message?: string
+  lastTransitionAt?: string
 }
-
-export interface ServiceResource {
-  kind: "Service"
-  name: string
-  type: "ClusterIP" | "NodePort" | "LoadBalancer"
-  ports: string
-  endpoints: number
-  age: string
-}
-
-export interface SecretResource {
-  kind: "Secret" | "ConfigMap"
-  name: string
-  subtype?: string
-  keys: number
-  age: string
-}
-
-export interface PvcResource {
-  kind: "PersistentVolumeClaim"
-  name: string
-  status: "Bound" | "Pending"
-  size: string
-  storageClass: string
-  age: string
-}
-
-export interface IngressResource {
-  kind: "Ingress"
-  name: string
-  host: string
-  tls: boolean
-  address: string
-  age: string
-}
-
-export interface ServiceAccountResource {
-  kind: "ServiceAccount"
-  name: string
-  age: string
-}
-
-export type K8sResource =
-  | PodResource
-  | ServiceResource
-  | SecretResource
-  | PvcResource
-  | IngressResource
-  | ServiceAccountResource
 
 export interface AtomTopology {
   /** Stable handle (atom slug + counter within app). */
   id: string
   atomType: string
   displayName: string
-  /** Reported by the atom's status workflow. */
+  /** Aggregate, derived from substatuses (worst wins). */
   status: AtomStatus
-  /** Conditions / human-readable detail from the status workflow. Empty when healthy. */
-  messages: string[]
+  /** Conditions published by the atom's status workflow. */
+  substatuses: Substatus[]
   /** When the status workflow last reported. */
   lastChecked: string
-  resources: K8sResource[]
-}
-
-const KIND_ORDER: K8sKind[] = [
-  "Pod",
-  "Service",
-  "Ingress",
-  "Secret",
-  "ConfigMap",
-  "PersistentVolumeClaim",
-  "ServiceAccount",
-]
-
-export function sortResources(resources: K8sResource[]): K8sResource[] {
-  return [...resources].sort((a, b) => {
-    const order = KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind)
-    if (order !== 0) return order
-    return a.name.localeCompare(b.name)
-  })
 }
 
 function seedFrom(seed: string): () => number {
@@ -125,241 +52,201 @@ function rangeInt(rng: () => number, min: number, max: number): number {
   return Math.floor(min + rng() * (max - min + 1))
 }
 
-const POD_HASH_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789"
-function podHash(rng: () => number, len: number): string {
-  let out = ""
-  for (let i = 0; i < len; i += 1) {
-    out += POD_HASH_ALPHABET[Math.floor(rng() * POD_HASH_ALPHABET.length)]
-  }
-  return out
-}
-
-const AGES = [
-  "12s",
-  "47s",
-  "3m",
-  "12m",
-  "47m",
-  "1h",
-  "3h",
-  "6h",
-  "1d",
-  "2d",
-  "5d",
-  "12d",
-  "23d",
-]
-
-function age(rng: () => number): string {
-  return AGES[Math.floor(rng() * AGES.length)]
-}
-
-const NODES = [
-  "worker-eu-1",
-  "worker-eu-2",
-  "worker-eu-3",
-  "worker-us-east-1",
-  "worker-us-east-2",
-]
-
-function node(rng: () => number): string {
-  return NODES[Math.floor(rng() * NODES.length)]
-}
-
-function podPhase(rng: () => number, status: AtomStatus): PodPhase {
-  if (status === "failed") return rng() < 0.5 ? "CrashLoopBackOff" : "Failed"
-  if (status === "reconciling" || status === "pending")
-    return rng() < 0.6 ? "Pending" : "Running"
-  return "Running"
-}
-
-interface AtomSpec {
+interface SubstatusTemplate {
   type: string
-  displayName: string
-  build: (
-    rng: () => number,
-    appName: string,
-    atomStatus: AtomStatus,
-    counter: { value: number },
-  ) => K8sResource[]
+  ok: { reason: string; message: string }
+  bad: { state: SubstatusState; reason: string; message: string }[]
 }
 
-function pods(
+const SUBSTATUS_TEMPLATES: Record<string, SubstatusTemplate[]> = {
+  container: [
+    {
+      type: "ImagePullable",
+      ok: { reason: "ImageFetched", message: "image fetched from registry" },
+      bad: [
+        {
+          state: "error",
+          reason: "ErrImagePull",
+          message: "manifest unknown for wordpress:6.4.99",
+        },
+      ],
+    },
+    {
+      type: "ReplicasReady",
+      ok: { reason: "AllReplicasReady", message: "3/3 replicas ready" },
+      bad: [
+        { state: "warn", reason: "PodNotReady", message: "1/3 pods not ready" },
+        { state: "error", reason: "CrashLoopBackOff", message: "2/3 pods restarting" },
+      ],
+    },
+    {
+      type: "Progressing",
+      ok: { reason: "NewReplicaSetAvailable", message: "rollout complete" },
+      bad: [
+        { state: "info", reason: "ReplicaSetUpdating", message: "rolling update 2/3 done" },
+      ],
+    },
+    {
+      type: "SpecMatches",
+      ok: { reason: "InSync", message: "actual state matches spec" },
+      bad: [
+        { state: "warn", reason: "EnvDrift", message: "env differs from spec on 2 keys" },
+      ],
+    },
+  ],
+  postgres: [
+    {
+      type: "ClusterReady",
+      ok: { reason: "ClusterHealthy", message: "all instances streaming WAL" },
+      bad: [
+        { state: "warn", reason: "ReplicaLag", message: "replica lagging 2.4s behind primary" },
+        { state: "error", reason: "PrimaryDown", message: "no primary elected" },
+      ],
+    },
+    {
+      type: "BackupOk",
+      ok: { reason: "RecentBackup", message: "last backup 4h ago, 1.2 GB" },
+      bad: [{ state: "warn", reason: "BackupStale", message: "no backup in last 36h" }],
+    },
+    {
+      type: "StorageHealthy",
+      ok: { reason: "VolumesBound", message: "all volumes bound, 64% used" },
+      bad: [{ state: "warn", reason: "VolumeNearFull", message: "data volume at 91% capacity" }],
+    },
+  ],
+  redis: [
+    {
+      type: "Ready",
+      ok: { reason: "Serving", message: "accepting connections" },
+      bad: [{ state: "error", reason: "NotReady", message: "no endpoints" }],
+    },
+    {
+      type: "MemoryHealthy",
+      ok: { reason: "BelowThreshold", message: "memory usage 42%" },
+      bad: [
+        {
+          state: "warn",
+          reason: "HighMemory",
+          message: "memory usage 87% — eviction approaching",
+        },
+      ],
+    },
+  ],
+  service: [
+    {
+      type: "EndpointsReady",
+      ok: { reason: "EndpointsPopulated", message: "3 endpoints behind selector" },
+      bad: [{ state: "warn", reason: "NoEndpoints", message: "selector matches 0 pods" }],
+    },
+  ],
+  ingress: [
+    {
+      type: "Admitted",
+      ok: { reason: "AcceptedByController", message: "ingress-nginx admitted" },
+      bad: [
+        {
+          state: "warn",
+          reason: "ControllerNotReady",
+          message: "ingress-nginx not yet reconciled",
+        },
+      ],
+    },
+    {
+      type: "TLSReady",
+      ok: { reason: "CertificateValid", message: "valid for 87 days" },
+      bad: [
+        {
+          state: "warn",
+          reason: "CertificateExpiring",
+          message: "certificate expires in 5 days",
+        },
+      ],
+    },
+  ],
+  "tls-cert": [
+    {
+      type: "Issued",
+      ok: { reason: "CertificateReady", message: "issued by letsencrypt-prod" },
+      bad: [{ state: "error", reason: "OrderFailed", message: "ACME rate limit reached" }],
+    },
+    {
+      type: "ValidityRemaining",
+      ok: { reason: "FarFromExpiry", message: "87 days until renewal" },
+      bad: [{ state: "warn", reason: "NearExpiry", message: "5 days until renewal" }],
+    },
+  ],
+  "s3-bucket": [
+    {
+      type: "BucketReady",
+      ok: { reason: "BucketOnline", message: "endpoint reachable" },
+      bad: [],
+    },
+    {
+      type: "QuotaHealthy",
+      ok: { reason: "BelowQuota", message: "12.4 GB / 100 GB used" },
+      bad: [{ state: "warn", reason: "QuotaNearLimit", message: "94% of quota used" }],
+    },
+  ],
+}
+
+const DEFAULT_TEMPLATES: SubstatusTemplate[] = [
+  {
+    type: "Ready",
+    ok: { reason: "Ready", message: "resource is operational" },
+    bad: [{ state: "warn", reason: "NotReady", message: "still converging" }],
+  },
+]
+
+function generateSubstatuses(
   rng: () => number,
-  appName: string,
-  prefix: string,
-  count: number,
-  image: string,
-  atomStatus: AtomStatus,
-): PodResource[] {
-  const replicaSetHash = podHash(rng, 9)
-  const out: PodResource[] = []
-  const phase = podPhase(rng, atomStatus)
-  for (let i = 0; i < count; i += 1) {
-    const podSuffix = podHash(rng, 5)
-    const isPodReady = phase === "Running" && (atomStatus === "healthy" || rng() > 0.3)
-    out.push({
-      kind: "Pod",
-      name: `${appName}-${prefix}-${replicaSetHash}-${podSuffix}`,
-      phase: i === count - 1 && atomStatus === "drift" ? "Pending" : phase,
-      ready: isPodReady ? "1/1" : "0/1",
-      restarts: atomStatus === "failed" ? rangeInt(rng, 4, 12) : rangeInt(rng, 0, 2),
-      age: age(rng),
-      image,
-      node: node(rng),
-    })
-  }
-  return out
-}
-
-const ATOM_SPECS: Record<string, AtomSpec> = {
-  postgres: {
-    type: "postgres",
-    displayName: "Postgres",
-    build: (rng, appName, atomStatus) => {
-      const replicas = rangeInt(rng, 1, 3)
-      const list: K8sResource[] = []
-      const podName = `${appName}-pg`
-      for (let i = 0; i < replicas; i += 1) {
-        list.push({
-          kind: "Pod",
-          name: `${podName}-${i}`,
-          phase: podPhase(rng, atomStatus),
-          ready: atomStatus === "healthy" ? "2/2" : i === replicas - 1 ? "1/2" : "2/2",
-          restarts: atomStatus === "failed" ? rangeInt(rng, 1, 4) : 0,
-          age: age(rng),
-          image: "ghcr.io/cloudnative-pg/postgresql:15.4",
-          node: node(rng),
-        })
+  atomType: string,
+  status: AtomStatus,
+  baseTs: number,
+): Substatus[] {
+  const templates = SUBSTATUS_TEMPLATES[atomType] ?? DEFAULT_TEMPLATES
+  return templates.map((tpl, idx) => {
+    const lastTransitionAt = new Date(
+      baseTs - rangeInt(rng, 60_000, 30 * 24 * 60 * 60 * 1000),
+    ).toISOString()
+    if (status === "pending") {
+      return {
+        type: tpl.type,
+        state: "unknown" as const,
+        reason: "NotProbed",
+        message: "no status reported yet",
+        lastTransitionAt,
       }
-      list.push({
-        kind: "Service",
-        name: `${appName}-pg-rw`,
-        type: "ClusterIP",
-        ports: "5432/TCP",
-        endpoints: 1,
-        age: age(rng),
-      })
-      if (replicas > 1) {
-        list.push({
-          kind: "Service",
-          name: `${appName}-pg-ro`,
-          type: "ClusterIP",
-          ports: "5432/TCP",
-          endpoints: replicas - 1,
-          age: age(rng),
-        })
+    }
+    if (status === "healthy") {
+      return {
+        type: tpl.type,
+        state: "ok" as const,
+        reason: tpl.ok.reason,
+        message: tpl.ok.message,
+        lastTransitionAt,
       }
-      list.push({
-        kind: "Secret",
-        name: `${appName}-pg-app`,
-        subtype: "Opaque",
-        keys: 5,
-        age: age(rng),
-      })
-      list.push({
-        kind: "PersistentVolumeClaim",
-        name: `${appName}-pg-storage-0`,
-        status: "Bound",
-        size: "10Gi",
-        storageClass: "standard",
-        age: age(rng),
-      })
-      return list
-    },
-  },
-  redis: {
-    type: "redis",
-    displayName: "Redis",
-    build: (rng, appName, atomStatus) => [
-      ...pods(rng, appName, "redis", 1, "redis:7.2-alpine", atomStatus),
-      {
-        kind: "Service",
-        name: `${appName}-redis`,
-        type: "ClusterIP",
-        ports: "6379/TCP",
-        endpoints: 1,
-        age: age(rng),
-      },
-      {
-        kind: "Secret",
-        name: `${appName}-redis-auth`,
-        subtype: "Opaque",
-        keys: 1,
-        age: age(rng),
-      },
-    ],
-  },
-  container: {
-    type: "container",
-    displayName: "Container",
-    build: (rng, appName, atomStatus) => {
-      const replicas = rangeInt(rng, 2, 3)
-      return pods(rng, appName, "app", replicas, "wordpress:6.4", atomStatus)
-    },
-  },
-  service: {
-    type: "service",
-    displayName: "Service",
-    build: (rng, appName) => [
-      {
-        kind: "Service",
-        name: appName,
-        type: "ClusterIP",
-        ports: "80/TCP",
-        endpoints: rangeInt(rng, 1, 3),
-        age: age(rng),
-      },
-    ],
-  },
-  ingress: {
-    type: "ingress",
-    displayName: "Ingress",
-    build: (rng, appName) => [
-      {
-        kind: "Ingress",
-        name: appName,
-        host: `${appName}.example.com`,
-        tls: true,
-        address: `203.0.113.${rangeInt(rng, 10, 240)}`,
-        age: age(rng),
-      },
-    ],
-  },
-  "tls-cert": {
-    type: "tls-cert",
-    displayName: "TLS Cert",
-    build: (rng, appName) => [
-      {
-        kind: "Secret",
-        name: `${appName}-tls`,
-        subtype: "kubernetes.io/tls",
-        keys: 2,
-        age: age(rng),
-      },
-    ],
-  },
-  "s3-bucket": {
-    type: "s3-bucket",
-    displayName: "S3 / MinIO",
-    build: (rng, appName) => [
-      {
-        kind: "Secret",
-        name: `${appName}-s3`,
-        subtype: "Opaque",
-        keys: 3,
-        age: age(rng),
-      },
-      {
-        kind: "Service",
-        name: `${appName}-s3`,
-        type: "ClusterIP",
-        ports: "9000/TCP",
-        endpoints: 1,
-        age: age(rng),
-      },
-    ],
-  },
+    }
+    const wantBad = idx === 0 || (tpl.bad.length > 0 && rng() < 0.55)
+    if (wantBad && tpl.bad.length > 0) {
+      let pool = tpl.bad
+      if (status === "failed" && pool.some((b) => b.state === "error")) {
+        pool = pool.filter((b) => b.state === "error")
+      } else if (status === "drift" && pool.some((b) => b.state === "warn")) {
+        pool = pool.filter((b) => b.state === "warn")
+      } else if (status === "reconciling" && pool.some((b) => b.state === "info")) {
+        pool = pool.filter((b) => b.state === "info")
+      }
+      const pick = pool[Math.floor(rng() * pool.length)]
+      return { type: tpl.type, ...pick, lastTransitionAt }
+    }
+    return {
+      type: tpl.type,
+      state: "ok" as const,
+      reason: tpl.ok.reason,
+      message: tpl.ok.message,
+      lastTransitionAt,
+    }
+  })
 }
 
 const TEMPLATE_TO_ATOMS: Record<string, string[]> = {
@@ -373,6 +260,20 @@ const TEMPLATE_TO_ATOMS: Record<string, string[]> = {
   cs2: ["container", "service"],
 }
 
+const ATOM_DISPLAY: Record<string, string> = {
+  postgres: "Postgres",
+  redis: "Redis",
+  "s3-bucket": "S3 / MinIO",
+  container: "Container",
+  service: "Service",
+  ingress: "Ingress",
+  "tls-cert": "TLS Cert",
+  secret: "Secret",
+  configmap: "ConfigMap",
+  pvc: "PersistentVolumeClaim",
+  "service-account": "ServiceAccount",
+}
+
 function deriveAtomStatus(rng: () => number, appStatus: Application["status"]): AtomStatus {
   if (appStatus === "Failed") return rng() < 0.5 ? "failed" : "drift"
   if (appStatus === "Installing" || appStatus === "Starting") return "reconciling"
@@ -382,34 +283,6 @@ function deriveAtomStatus(rng: () => number, appStatus: Application["status"]): 
   return "healthy"
 }
 
-const STATUS_MESSAGES: Record<AtomStatus, string[][]> = {
-  healthy: [[]],
-  reconciling: [
-    ["Applying new image tag v6.4.2", "Rolling restart: 1/3 pods updated"],
-    ["Scaling replicas 1 → 2", "Waiting for endpoints to converge"],
-    ["Issuing new certificate from letsencrypt-prod"],
-    ["Provisioning storage volume"],
-  ],
-  drift: [
-    ["Actual state diverges from spec on env vars"],
-    ["One pod runs an older image digest", "ReplicaSet has 2 revisions, expected 1"],
-    ["Service selector matches 0 pods — orphaned endpoint slice"],
-    ["TLS secret missing — kubernetes.io/tls handle stale"],
-  ],
-  failed: [
-    ["Pod CrashLoopBackOff for 12m", "Last termination reason: OOMKilled at 1.8 GB"],
-    ["Image pull failed: manifest unknown for wordpress:6.4.99"],
-    ["PVC stuck in Pending — no matching StorageClass"],
-    ["Certificate request denied by ACME (rate limit)"],
-  ],
-  pending: [["Awaiting first reconcile"]],
-}
-
-function pickMessages(rng: () => number, status: AtomStatus): string[] {
-  const bucket = STATUS_MESSAGES[status]
-  return bucket[Math.floor(rng() * bucket.length)]
-}
-
 export function generateTopology(app: Application): AtomTopology[] {
   const rng = seedFrom(`${app.name}:topology`)
   const atomTypes = TEMPLATE_TO_ATOMS[app.templateSlug] ?? ["container", "service"]
@@ -417,20 +290,17 @@ export function generateTopology(app: Application): AtomTopology[] {
   const counters: Record<string, number> = {}
 
   for (const atomType of atomTypes) {
-    const spec = ATOM_SPECS[atomType]
-    if (!spec) continue
     counters[atomType] = (counters[atomType] ?? 0) + 1
     const atomStatus = deriveAtomStatus(rng, app.status)
-    const resources = sortResources(spec.build(rng, app.name, atomStatus, { value: 0 }))
-    const lastCheckedMs = Date.now() - rangeInt(rng, 2_000, 90_000)
+    const now = Date.now()
+    const lastCheckedMs = now - rangeInt(rng, 2_000, 90_000)
     result.push({
       id: `${atomType}-${counters[atomType]}`,
       atomType,
-      displayName: spec.displayName,
+      displayName: ATOM_DISPLAY[atomType] ?? atomType,
       status: atomStatus,
-      messages: pickMessages(rng, atomStatus),
+      substatuses: generateSubstatuses(rng, atomType, atomStatus, now),
       lastChecked: new Date(lastCheckedMs).toISOString(),
-      resources,
     })
   }
   return result

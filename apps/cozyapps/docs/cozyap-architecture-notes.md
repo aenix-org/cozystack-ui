@@ -173,9 +173,9 @@ Each atom carries **two** workflow templates, not one:
 
 - **`reconcile`** — drives the cluster towards desired state, writes
   outputs. Cron + event-triggered. Has side effects.
-- **`status`** — read-only probe that reports observed health and
-  human-readable conditions. Cron-only, runs more often than
-  reconcile (e.g. every 30–60 s). Idempotent by construction.
+- **`status`** — read-only probe that reports observed health as a
+  list of typed conditions. Cron-only, runs more often than reconcile
+  (e.g. every 30–60 s). Idempotent by construction.
 
 ```yaml
 spec:
@@ -185,51 +185,100 @@ spec:
   reconcile:
     steps: [...]              # apply desired
   status:
+    publishes:                # the conditions this atom guarantees
+      - ClusterReady
+      - BackupOk
+      - StorageHealthy
     steps:
       - check-cluster-phase
-      - check-replicas-ready
-      - check-service-endpoints
-      - aggregate              # → Application.status.atoms[atom]
+      - check-last-backup-age
+      - check-pvc-utilisation
+      - aggregate              # → Application.status.atoms[atom].conditions
 ```
 
-The status workflow publishes to `Application.status.atoms[<atomName>]`:
+The status workflow publishes a **list of conditions** (mirrors the
+k8s Conditions API) to `Application.status.atoms[<atomName>]`:
 
 ```yaml
 status:
   atoms:
     postgres:
-      status: healthy
-      messages: []
+      status: healthy           # aggregate, worst-condition-wins
       lastChecked: 2024-01-15T10:30:00Z
-    container:
-      status: drift
-      messages:
-        - "One pod runs an older image digest"
-        - "ReplicaSet has 2 revisions, expected 1"
-      lastChecked: 2024-01-15T10:30:05Z
+      conditions:
+        - type: ClusterReady
+          state: ok
+          reason: ClusterHealthy
+          message: "all instances streaming WAL"
+          lastTransitionAt: ...
+        - type: BackupOk
+          state: warn
+          reason: BackupStale
+          message: "no backup in last 36h"
+          lastTransitionAt: ...
+        - type: StorageHealthy
+          state: ok
+          reason: VolumesBound
+          message: "all volumes bound, 64% used"
+          lastTransitionAt: ...
 ```
+
+Each **condition** carries `type` (machine name, declared by the
+atom in `status.publishes`), `state` (`ok` / `warn` / `error` /
+`info` / `unknown`), `reason` (CamelCase machine label) and a short
+human `message`.
+
+**Aggregate atom status = worst-state of its conditions** (with `info`
+mapping to `reconciling`). No condition states → `pending`.
+
+**Aggregate Application sync state** = worst across all atoms.
+That's what `SyncStateBadge` reflects: `In sync` / `Drift detected` /
+`Reconciling` / `Reconcile failed`.
 
 **Why this matters:**
 
-- **Decoupling**: status keeps reporting even when reconcile is idle —
-  drift detected by status triggers a reconcile.
-- **Visibility**: UI shows live atom status without waiting for the
-  next reconcile cycle.
-- **Composability**: a downstream atom's status workflow can read the
-  upstream atom's status to make smart decisions
-  (`if postgres.status != healthy then mark self as 'waiting upstream'`).
-- **Cost**: status is short and read-only, cheap to run frequently.
+- **Decoupling**: status keeps reporting even when reconcile is idle.
+  Drift detected by a status condition triggers a reconcile.
+- **Visibility**: UI surfaces named conditions, not free-form
+  messages. Stable identifiers, scriptable, alertable.
+- **Composability**: a downstream atom's status workflow can read an
+  upstream condition by name (`if postgres.ClusterReady != ok then …`).
+- **Cost**: short and read-only, cheap to run frequently.
 
-**Aggregate Application sync state** is computed from per-atom
-statuses by the controller (worst wins): all healthy → `In sync`, any
-drift → `Drift detected`, any reconciling → `Reconciling`, any failed
-→ `Reconcile failed`. This is what the SyncStateBadge in the UI
-reflects.
+**Conditions contract:** atom-author declares the condition `type`s
+they publish in `spec.status.publishes`. Stable, public API of the
+atom. Adding a new condition type — minor version bump. Removing or
+renaming — major.
 
-**Messages contract:** short, present tense, actionable when possible
-("Image pull failed: manifest unknown for wordpress:6.4.99" rather
-than "There was an error"). Authored by the atom maintainer in
-status DAG steps. UI renders them inline on the topology view.
+---
+
+## 4b. The Atom Is a Black Box
+
+We deliberately do **not** expose the internal Kubernetes objects
+(`Pod`, `ReplicaSet`, `Endpoints`, intermediate Secrets, …) in the
+user-facing UI. The atom's contract is:
+
+1. Its **outputs** (typed ports — `secret-ref`, `service-ref`, …).
+2. Its **published conditions** (named, state-tagged, with messages).
+3. Its **reconcile DAG** (visible to template authors, not tenants).
+
+Whether the `Postgres` atom renders a CNPG `Cluster`, a Zalando
+`postgresql`, a hand-rolled StatefulSet, or wraps an external RDS is
+**none of the tenant's business**. What matters is:
+
+- "Did the atom emit `credentials` (secret-ref) and `service`
+  (service-ref)?"
+- "Is `ClusterReady` ok?"
+- "How is `BackupOk` doing?"
+
+If the tenant needs lower-level debugging they drop to kubectl with
+their kubeconfig. The platform UI stays at the **atom level**, which
+is the only level where the contract is stable across atom versions
+and managed-service backend swaps.
+
+This also keeps the model **portable**: an atom written against CNPG
+today and reimplemented against Crunchy Postgres tomorrow exposes
+the same outputs and conditions. Tenant-facing graphs don't break.
 
 ---
 
@@ -424,13 +473,17 @@ Pattern: Houdini / Unreal Blueprint.
 **Application detail page:**
 
 - **Sync state badge** at the top: `In sync` / `Drift detected` /
-  `Reconciling`.
-- **Reconcile Runs** timeline — replaces "Deployment History".
-  Each entry: trigger (cron / spec / event), result (changed / noop),
-  outputs diff, duration, logs.
+  `Reconciling` / `Reconcile failed`.
+- **Topology** section — list of atoms in the application graph,
+  each with status pill and expandable list of published conditions
+  (Conditions-style rows: state icon + type + reason + message).
+  **K8s objects under each atom are not exposed** — atom is a
+  black box. See §4b.
+- **Changes** timeline (user-facing name for reconcile runs). Each
+  entry: trigger (cron / spec / event), result chip (changed / noop /
+  failed), outputs diff, duration.
 - **Pin status** per parameter — lock / auto-track icons.
-- Existing generic metrics (uptime, CPU/RAM/storage, restarts, cost),
-  logs viewer.
+- Generic metrics (uptime, CPU/RAM/storage, restarts) and logs viewer.
 
 ---
 
