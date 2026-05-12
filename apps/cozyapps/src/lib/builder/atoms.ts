@@ -8,6 +8,7 @@ import {
   FormInput,
   Globe,
   HardDrive,
+  Hash,
   KeyRound,
   Layers,
   Network,
@@ -50,6 +51,9 @@ export interface AtomDef {
   hasDynamicFields?: boolean
 }
 
+import type { AtomNodeData } from "./types.ts"
+import { fieldToPort } from "./dynamic-fields.ts"
+
 export const ATOMS: AtomDef[] = [
   // ─── Inputs ────────────────────────────────────────────────────────────
   {
@@ -64,6 +68,33 @@ export const ATOMS: AtomDef[] = [
     outputs: [],
     params: [],
     hasDynamicFields: true,
+  },
+  {
+    type: "constant",
+    displayName: "Constant",
+    category: "Inputs",
+    description: "A fixed literal value baked into the template",
+    icon: Hash,
+    accentBg: "bg-slate-100",
+    accentFg: "text-slate-700",
+    inputs: [],
+    outputs: [],
+    params: [
+      {
+        key: "valueType",
+        label: "Type",
+        type: "enum",
+        options: ["string", "number", "boolean", "image", "host"],
+        defaultValue: "string",
+      },
+      {
+        key: "value",
+        label: "Value",
+        type: "string",
+        placeholder: "wordpress:6.4",
+        hint: "Boolean values: type 'true' or 'false'",
+      },
+    ],
   },
 
   // ─── K8s Primitives ───────────────────────────────────────────────────
@@ -394,13 +425,28 @@ export function findAtom(type: string): AtomDef | undefined {
   return ATOMS.find((a) => a.type === type)
 }
 
-import type { AtomNodeData } from "./types.ts"
-import { fieldToPort } from "./dynamic-fields.ts"
+function constantOutputs(data: AtomNodeData): PortDef[] {
+  const valueType = String(data.params.valueType ?? "string")
+  const portType: PortType =
+    valueType === "number"
+      ? "number"
+      : valueType === "boolean"
+        ? "boolean"
+        : valueType === "image"
+          ? "image-ref"
+          : valueType === "host"
+            ? "ingress-host"
+            : "string"
+  return [{ key: "value", label: "value", type: portType }]
+}
 
-/** Outputs accounting for dynamic fields (User Input). */
+/** Outputs accounting for dynamic fields (User Input) and computed outputs (Constant). */
 export function effectiveOutputs(atom: AtomDef, data: AtomNodeData): PortDef[] {
   if (atom.hasDynamicFields) {
     return (data.fields ?? []).map(fieldToPort)
+  }
+  if (atom.type === "constant") {
+    return constantOutputs(data)
   }
   return atom.outputs
 }
