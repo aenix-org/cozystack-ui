@@ -1,13 +1,6 @@
 import { useId, useMemo, useRef, useState } from "react"
 import { Link, useParams } from "react-router"
-import {
-  Archive,
-  Boxes,
-  CircleDollarSign,
-  Gauge,
-  RefreshCw,
-  Trash2,
-} from "lucide-react"
+import { Archive, Boxes, Gauge, RefreshCw, Trash2 } from "lucide-react"
 import { Button, Section, StatusBadge } from "@cozystack/ui"
 import { addAction, findApplication, useApplications } from "../lib/mock-store.ts"
 import { applicationStatusTone } from "../lib/status.ts"
@@ -21,7 +14,6 @@ import { ActionsMenu } from "../components/ActionsMenu.tsx"
 import { Modal } from "../components/Modal.tsx"
 import { MetricStatCard } from "../components/MetricStatCard.tsx"
 import { UsageBar } from "../components/UsageBar.tsx"
-import { Sparkline } from "../components/Sparkline.tsx"
 import { LogsViewer } from "../components/LogsViewer.tsx"
 import { ChangesTimeline, SyncStateBadge } from "../components/ChangesTimeline.tsx"
 
@@ -121,7 +113,7 @@ export function ApplicationDetailsPage() {
 
       <div className="space-y-5">
         <Section title="Health & Capacity">
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <MetricStatCard
               icon={<Gauge className="size-3" />}
               label="Uptime · 24h"
@@ -140,17 +132,6 @@ export function ApplicationDetailsPage() {
               label="Restarts · 24h"
               value={metrics.restarts24h}
               tone={restartsTone}
-            />
-            <MetricStatCard
-              icon={<CircleDollarSign className="size-3" />}
-              label="Cost · month"
-              value={`$${metrics.cost.monthlyUsd.toFixed(2)}`}
-              hint={
-                <span className="flex items-center gap-2">
-                  <Sparkline values={metrics.cost.sparkline7d} width={56} height={16} />
-                  7-day spend
-                </span>
-              }
             />
           </div>
           <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
