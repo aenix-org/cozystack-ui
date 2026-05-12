@@ -4,8 +4,10 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter @cozystack/console dev",
+    "dev:cozyapps": "pnpm --filter @cozystack/cozyapps dev",
     "build": "pnpm -r build",
     "build:console": "pnpm --filter @cozystack/console build",
+    "build:cozyapps": "pnpm --filter @cozystack/cozyapps build",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck"
   },
