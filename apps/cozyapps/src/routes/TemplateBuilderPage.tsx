@@ -13,9 +13,12 @@ import {
   type Connection,
   type Edge,
   type EdgeTypes,
+  type FinalConnectionState,
   type Node,
   type NodeTypes,
   type OnConnect,
+  type OnConnectEnd,
+  type OnConnectStart,
   type ReactFlowInstance,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
@@ -26,6 +29,8 @@ import { AtomNode } from "../components/builder/AtomNode.tsx"
 import { AtomEdge } from "../components/builder/AtomEdge.tsx"
 import { AtomPalette } from "../components/builder/AtomPalette.tsx"
 import { AtomInspector } from "../components/builder/AtomInspector.tsx"
+import { AtomSuggestPopup } from "../components/builder/AtomSuggestPopup.tsx"
+import type { SuggestionTarget } from "../lib/builder/suggestions.ts"
 import {
   PublishDialog,
   type PublishedTemplateDraft,
@@ -36,7 +41,11 @@ import {
   findAtom,
   type AtomDef,
 } from "../lib/builder/atoms.ts"
-import { isCompatible, paramTypeToPortType } from "../lib/builder/port-types.ts"
+import {
+  isCompatible,
+  paramTypeToPortType,
+  type PortType,
+} from "../lib/builder/port-types.ts"
 import {
   ATOM_EDGE_MARKERS,
   isParamHandle,
@@ -90,6 +99,19 @@ function BuilderInner() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [publishOpen, setPublishOpen] = useState(false)
   const [running, setRunning] = useState(false)
+  const [pendingSpawn, setPendingSpawn] = useState<{
+    sourceNodeId: string
+    sourceHandle: string
+    sourcePortType: PortType
+    screenX: number
+    screenY: number
+    flowPosition: { x: number; y: number }
+  } | null>(null)
+  const connectStart = useRef<{
+    nodeId: string
+    handleId: string
+    portType: PortType
+  } | null>(null)
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
   const reactFlowWrapper = useRef<HTMLDivElement | null>(null)
   const rfInstance = useRef<ReactFlowInstance<BuilderNode, Edge> | null>(null)
@@ -140,6 +162,78 @@ function BuilderInner() {
       )
     },
     [nodes, setEdges],
+  )
+
+  const onConnectStart: OnConnectStart = useCallback(
+    (_event, params) => {
+      connectStart.current = null
+      const { nodeId, handleId, handleType } = params
+      if (handleType !== "source" || !nodeId || !handleId) return
+      const node = nodes.find((n) => n.id === nodeId)
+      if (!node) return
+      const atom = findAtom(node.data.atomType)
+      if (!atom) return
+      const port = atom.outputs.find((p) => p.key === handleId)
+      if (!port) return
+      connectStart.current = { nodeId, handleId, portType: port.type }
+    },
+    [nodes],
+  )
+
+  const onConnectEnd: OnConnectEnd = useCallback((event, connectionState: FinalConnectionState) => {
+    const ctx = connectStart.current
+    connectStart.current = null
+    if (!ctx) return
+    if (connectionState.toNode) return
+    if (!rfInstance.current) return
+    const clientX = "clientX" in event ? event.clientX : event.changedTouches?.[0]?.clientX
+    const clientY = "clientY" in event ? event.clientY : event.changedTouches?.[0]?.clientY
+    if (clientX == null || clientY == null) return
+    const flowPosition = rfInstance.current.screenToFlowPosition({ x: clientX, y: clientY })
+    setPendingSpawn({
+      sourceNodeId: ctx.nodeId,
+      sourceHandle: ctx.handleId,
+      sourcePortType: ctx.portType,
+      screenX: clientX,
+      screenY: clientY,
+      flowPosition,
+    })
+  }, [])
+
+  const spawnFromSuggestion = useCallback(
+    (target: SuggestionTarget) => {
+      if (!pendingSpawn) return
+      setNodes((current) => {
+        const id = makeNodeId(target.atom.type, current)
+        const newNode: BuilderNode = {
+          id,
+          type: "atom",
+          position: pendingSpawn.flowPosition,
+          data: {
+            atomType: target.atom.type,
+            params: defaultParams(target.atom),
+            exposed: target.kind === "param" ? [target.targetHandle] : [],
+            status: "idle",
+          },
+        }
+        const targetHandle =
+          target.kind === "param" ? paramHandleId(target.targetHandle) : target.targetHandle
+        const newEdge: Edge = {
+          id: `${pendingSpawn.sourceNodeId}:${pendingSpawn.sourceHandle}->${id}:${targetHandle}`,
+          source: pendingSpawn.sourceNodeId,
+          sourceHandle: pendingSpawn.sourceHandle,
+          target: id,
+          targetHandle,
+          type: "atom",
+          data: { portType: pendingSpawn.sourcePortType },
+          markerEnd: ATOM_EDGE_MARKERS,
+        }
+        setEdges((eds) => [...eds, newEdge])
+        return [...current, newNode]
+      })
+      setPendingSpawn(null)
+    },
+    [pendingSpawn, setEdges, setNodes],
   )
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -409,6 +503,8 @@ function BuilderInner() {
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onConnectStart={onConnectStart}
+            onConnectEnd={onConnectEnd}
             onDrop={onDrop}
             onDragOver={onDragOver}
             onInit={(instance) => {
@@ -454,6 +550,16 @@ function BuilderInner() {
         onOpenChange={setPublishOpen}
         onPublish={handlePublish}
       />
+
+      {pendingSpawn && (
+        <AtomSuggestPopup
+          screenX={pendingSpawn.screenX}
+          screenY={pendingSpawn.screenY}
+          sourcePortType={pendingSpawn.sourcePortType}
+          onPick={spawnFromSuggestion}
+          onClose={() => setPendingSpawn(null)}
+        />
+      )}
     </div>
   )
 }
