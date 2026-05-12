@@ -96,3 +96,7 @@ export function addTemplate(template: ApplicationTemplate) {
 export function findApplication(name: string): Application | undefined {
   return state.applications.find((a) => a.name === name)
 }
+
+export function findTemplate(slug: string): ApplicationTemplate | undefined {
+  return state.templates.find((t) => t.slug === slug)
+}

@@ -2,8 +2,12 @@ import { useMemo, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router"
 import { Rocket } from "lucide-react"
 import { Button } from "@cozystack/ui"
-import { findTemplate } from "../lib/mocks/templates.ts"
-import { addApplication, useEnvironments } from "../lib/mock-store.ts"
+import {
+  addApplication,
+  findTemplate,
+  useEnvironments,
+  useTemplates,
+} from "../lib/mock-store.ts"
 import type { ParamDef } from "../lib/types.ts"
 import { Breadcrumb } from "../components/Breadcrumb.tsx"
 import { PageHeader } from "../components/PageHeader.tsx"
@@ -13,6 +17,7 @@ import { FormField, inputClass } from "../components/FormField.tsx"
 const NAME_RE = /^[a-z]([-a-z0-9]*[a-z0-9])?$/
 
 export function LaunchFormPage() {
+  useTemplates()
   const { template: slug } = useParams<{ template: string }>()
   const template = slug ? findTemplate(slug) : undefined
   const environments = useEnvironments()

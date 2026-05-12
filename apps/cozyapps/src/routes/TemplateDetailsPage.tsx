@@ -1,7 +1,7 @@
 import { Link, useParams } from "react-router"
 import { Check, Rocket } from "lucide-react"
 import { Button, Section } from "@cozystack/ui"
-import { findTemplate } from "../lib/mocks/templates.ts"
+import { findTemplate, useTemplates } from "../lib/mock-store.ts"
 import { Breadcrumb } from "../components/Breadcrumb.tsx"
 import { AppIcon } from "../components/AppIcon.tsx"
 import { CategoryBadge } from "../components/CategoryBadge.tsx"
@@ -9,6 +9,7 @@ import { ResourcePill } from "../components/ResourcePill.tsx"
 import { DescriptionTable } from "../components/DescriptionTable.tsx"
 
 export function TemplateDetailsPage() {
+  useTemplates()
   const { template: slug } = useParams<{ template: string }>()
   const template = slug ? findTemplate(slug) : undefined
 

@@ -305,7 +305,3 @@ export const TEMPLATES: ApplicationTemplate[] = [
     ],
   },
 ]
-
-export function findTemplate(slug: string): ApplicationTemplate | undefined {
-  return TEMPLATES.find((t) => t.slug === slug)
-}
