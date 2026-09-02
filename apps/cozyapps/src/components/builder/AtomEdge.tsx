@@ -1,5 +1,5 @@
 import { memo } from "react"
-import { BaseEdge, getSmoothStepPath, type EdgeProps } from "@xyflow/react"
+import { BaseEdge, getBezierPath, type EdgeProps } from "@xyflow/react"
 import { PORT_TYPE, type PortType } from "../../lib/builder/port-types.ts"
 
 interface AtomEdgeData {
@@ -20,19 +20,18 @@ function AtomEdgeImpl({
   selected,
   markerEnd,
 }: EdgeProps) {
-  const [path] = getSmoothStepPath({
+  const [path] = getBezierPath({
     sourceX,
     sourceY,
     targetX,
     targetY,
     sourcePosition,
     targetPosition,
-    borderRadius: 12,
-    offset: 24,
+    curvature: 0.32,
   })
   const ed = data as AtomEdgeData | undefined
-  const stroke = ed?.portType ? PORT_TYPE[ed.portType].stroke : "#94a3b8"
-  const baseWidth = selected ? 2.5 : 1.75
+  const stroke = ed?.portType ? PORT_TYPE[ed.portType].stroke : "#0971EB"
+  const baseWidth = selected ? 2.75 : 2
 
   return (
     <>

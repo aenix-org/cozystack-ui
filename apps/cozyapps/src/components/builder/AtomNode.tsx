@@ -37,7 +37,7 @@ function handleStyle(type: keyof typeof PORT_TYPE, top: number): React.CSSProper
 
 function StatusIndicator({ status }: { status: RunStatus }) {
   if (status === "running") {
-    return <Loader2 className="size-3.5 animate-spin text-blue-500" />
+    return <Loader2 className="size-3.5 animate-spin text-[#0971EB]" />
   }
   if (status === "succeeded") {
     return <CheckCircle2 className="size-3.5 text-emerald-500" />
@@ -90,11 +90,11 @@ function AtomNodeContent({ atom, outputs, status, exposed, selected }: AtomNodeC
   return (
     <div
       className={cn(
-        "w-56 rounded-xl border bg-white shadow-sm transition-all",
+        "w-56 rounded-xl border bg-white shadow-sm transition-all hover:shadow-[0_8px_24px_-8px_rgba(9,113,235,0.35)]",
         selected
-          ? "border-blue-400 ring-2 ring-blue-200"
+          ? "border-[#0971EB] ring-2 ring-[#01A5FF]/25"
           : status === "running"
-            ? "border-blue-300 ring-2 ring-blue-200"
+            ? "border-[#01A5FF] ring-2 ring-[#01A5FF]/25"
             : status === "succeeded"
               ? "border-emerald-300"
               : status === "failed"
