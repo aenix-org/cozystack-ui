@@ -1,4 +1,4 @@
-import { LayoutGrid, Store, Server, Settings } from "lucide-react"
+import { LayoutGrid, Store, Blocks, Server, Settings } from "lucide-react"
 import type { SidebarSection } from "@cozystack/ui"
 
 export const SIDEBAR_SECTIONS: SidebarSection[] = [
@@ -7,6 +7,7 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
     items: [
       { label: "My Apps", to: "/apps", icon: LayoutGrid, end: true },
       { label: "App Store", to: "/store", icon: Store },
+      { label: "App Builder", to: "/store/new", icon: Blocks },
     ],
   },
   {
