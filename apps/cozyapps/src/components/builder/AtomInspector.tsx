@@ -148,7 +148,7 @@ export function AtomInspector({
                       className={cn(
                         "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors",
                         isExposed
-                          ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                          ? "bg-[#0971EB]/12 text-[#0971EB] hover:bg-[#0971EB]/20"
                           : "text-slate-400 hover:bg-slate-100 hover:text-slate-700",
                       )}
                       title={isExposed ? "Unbind and edit inline" : "Expose as input port"}
@@ -167,7 +167,7 @@ export function AtomInspector({
                     </button>
                   </div>
                   {isExposed ? (
-                    <div className="rounded-md border border-dashed border-blue-200 bg-blue-50/60 px-2 py-1.5 text-xs italic text-blue-700">
+                    <div className="rounded-md border border-dashed border-[#0971EB]/40 bg-[#01A5FF]/8 px-2 py-1.5 text-xs italic text-[#0971EB]">
                       From upstream — connect a value
                     </div>
                   ) : inline ? (
